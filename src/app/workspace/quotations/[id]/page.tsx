@@ -4,10 +4,10 @@ import { db } from "@/lib/db";
 import { requireInternalUser, getFeatureFlags } from "@/lib/guards";
 import { calculateBlendedRiskScore, resolveVolumeBonus } from "@/lib/discount-engine";
 import { AddLineForm } from "./add-line-form";
+import { ApprovalStepForm } from "./approval-step-form";
 import {
   removeLineAction,
   submitForApprovalAction,
-  decideApprovalAction,
   addUpsellLineAction,
   getUpsellSuggestionsForQuotation,
   overrideFulfillmentAction,
@@ -36,7 +36,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate, formatDateTime, cn } from "@/lib/utils";
 
-const ROLE_FOR_LEVEL = { MANAGER: "SALES_MANAGER", FINANCE: "FINANCE" } as const;
+function canActOnLevel(
+  level: "MANAGER" | "FINANCE",
+  role: string,
+  flags: { canApproveManagerStep: boolean; canApproveFinanceStep: boolean },
+) {
+  if (role === "ADMIN") return true;
+  if (level === "MANAGER") return role === "SALES_MANAGER" || flags.canApproveManagerStep;
+  return role === "FINANCE" || flags.canApproveFinanceStep;
+}
 
 export default async function QuotationDetailPage({
   params,
@@ -100,7 +108,6 @@ export default async function QuotationDetailPage({
     take: 10,
   });
 
-  const canManageApprovals = user.role === "ADMIN" || user.role === "SALES_MANAGER" || user.role === "FINANCE";
   const nextPendingStep = quotation.approvalSteps.find((s) => s.status === "PENDING");
 
   const invoice = quotation.invoices[0];
@@ -284,29 +291,15 @@ export default async function QuotationDetailPage({
                     By {step.reviewer.name} · {step.reason || "no reason given"}
                   </p>
                 )}
-                {canManageApprovals &&
-                  step.status === "PENDING" &&
-                  step.id === nextPendingStep?.id &&
-                  user.role === ROLE_FOR_LEVEL[step.level] && (
-                    <form action={decideApprovalAction} className="mt-3 flex flex-wrap items-center gap-2">
-                      <input type="hidden" name="stepId" value={step.id} />
-                      <input type="hidden" name="quotationId" value={quotation.id} />
-                      <Input
-                        name="reason"
-                        placeholder="Reason (optional)"
-                        className="min-w-[160px] flex-1"
-                      />
-                      <Button name="decision" value="APPROVED" size="sm" variant="success">
-                        Approve
-                      </Button>
-                      <Button name="decision" value="REJECTED" size="sm" variant="destructive">
-                        Reject
-                      </Button>
-                      <Button name="decision" value="RETURNED" size="sm" variant="outline">
-                        Return for Revision
-                      </Button>
-                    </form>
-                  )}
+                <ApprovalStepForm
+                  quotationId={quotation.id}
+                  stepId={step.id}
+                  canAct={
+                    step.status === "PENDING" &&
+                    step.id === nextPendingStep?.id &&
+                    canActOnLevel(step.level, user.role, flags)
+                  }
+                />
               </div>
             ))}
           </CardContent>

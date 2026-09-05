@@ -142,6 +142,26 @@ export default async function UsersAdminPage() {
                     <Switch name="canSeeUpsellPanel" defaultChecked={u.canSeeUpsellPanel} label="Upsell panel" />
                   </div>
 
+                  {u.role !== "ADMIN" && (
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-md bg-muted/50 px-3 py-2">
+                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Approval authority
+                      </span>
+                      <Switch
+                        name="canApproveManagerStep"
+                        defaultChecked={u.role === "SALES_MANAGER" || u.canApproveManagerStep}
+                        label={u.role === "SALES_MANAGER" ? "Manager-level (role default)" : "Manager-level"}
+                        disabled={u.role === "SALES_MANAGER"}
+                      />
+                      <Switch
+                        name="canApproveFinanceStep"
+                        defaultChecked={u.role === "FINANCE" || u.canApproveFinanceStep}
+                        label={u.role === "FINANCE" ? "Finance-level (role default)" : "Finance-level"}
+                        disabled={u.role === "FINANCE"}
+                      />
+                    </div>
+                  )}
+
                   {u.role === "ADMIN" ? (
                     <p className="rounded-md bg-accent-soft px-3 py-2 text-xs text-muted-foreground">
                       Admin role always has full backend access — nothing to toggle here.

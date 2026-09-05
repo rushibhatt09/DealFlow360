@@ -19,6 +19,7 @@ import {
   Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ToastProvider } from "@/components/ui/toast";
 
 export const ICONS = {
   "file-text": FileText,
@@ -75,6 +76,7 @@ export function AppShell({
   const SecondaryIcon = ICONS[secondaryLink?.icon ?? "settings"];
 
   return (
+    <ToastProvider>
     <div className="flex min-h-screen">
       <aside className="fixed inset-y-0 left-0 z-20 flex w-60 flex-col border-r border-border bg-card">
         <div className="flex h-16 items-center gap-2 border-b border-border px-5">
@@ -147,6 +149,7 @@ export function AppShell({
         <main className="mx-auto max-w-6xl px-8 py-8">{children}</main>
       </div>
     </div>
+    </ToastProvider>
   );
 }
 

@@ -93,6 +93,14 @@ model User {
   canViewDealHealth  Boolean @default(true)
   canSeeUpsellPanel  Boolean @default(true)
 
+  // Approval authority is independent of role: SALES_MANAGER / FINANCE
+  // always retain their own level (checked in code, not stored here), but
+  // an Admin can also grant either level to any other profile -- e.g. a
+  // trusted Sales Rep covering for Finance while they're out. Both default
+  // false so granting them is always a deliberate Admin action.
+  canApproveManagerStep Boolean @default(false)
+  canApproveFinanceStep Boolean @default(false)
+
   // Admin backend section access, split into View (read-only) and Edit
   // (can also create/change records) per section -- Edit without View
   // makes no sense, so the server always treats Edit as implying View

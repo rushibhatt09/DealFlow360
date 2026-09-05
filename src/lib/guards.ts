@@ -45,6 +45,8 @@ const FEATURE_SELECT = {
   canViewCustomers: true,
   canEditCustomers: true,
   canViewReports: true,
+  canApproveManagerStep: true,
+  canApproveFinanceStep: true,
 } as const;
 
 export type FeatureFlag = keyof typeof FEATURE_SELECT;
@@ -126,6 +128,30 @@ export async function requireSectionEdit(section: AdminSection): Promise<Interna
     select: FEATURE_SELECT,
   });
   if (!flags[edit]) redirect("/workspace/quotations");
+  return user;
+}
+
+/**
+ * Gates acting on an approval step. SALES_MANAGER/FINANCE always keep
+ * authority over their own level, and ADMIN bypasses everything -- but
+ * beyond that, authority is a per-user grant (canApproveManagerStep /
+ * canApproveFinanceStep) an Admin can hand to any profile, so approval
+ * rights aren't locked to those three roles.
+ */
+export async function requireApprovalAuthority(
+  level: "MANAGER" | "FINANCE",
+): Promise<InternalSessionData> {
+  const user = await requireInternalUser();
+  if (user.role === "ADMIN") return user;
+  if (level === "MANAGER" && user.role === "SALES_MANAGER") return user;
+  if (level === "FINANCE" && user.role === "FINANCE") return user;
+
+  const flags = await db.user.findUniqueOrThrow({
+    where: { id: user.userId },
+    select: { canApproveManagerStep: true, canApproveFinanceStep: true },
+  });
+  const authorized = level === "MANAGER" ? flags.canApproveManagerStep : flags.canApproveFinanceStep;
+  if (!authorized) redirect("/workspace/quotations");
   return user;
 }
 

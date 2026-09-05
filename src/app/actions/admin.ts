@@ -36,6 +36,8 @@ export async function updateInternalUserAction(formData: FormData) {
   const canViewDealHealth = formData.get("canViewDealHealth") === "on";
   const canSeeUpsellPanel = formData.get("canSeeUpsellPanel") === "on";
   const canViewReports = formData.get("canViewReports") === "on";
+  const canApproveManagerStep = formData.get("canApproveManagerStep") === "on";
+  const canApproveFinanceStep = formData.get("canApproveFinanceStep") === "on";
 
   // Edit implies View regardless of what was literally submitted -- an
   // edit-only, can't-see-the-list state makes no sense to allow.
@@ -58,6 +60,8 @@ export async function updateInternalUserAction(formData: FormData) {
       canViewDealHealth,
       canSeeUpsellPanel,
       canViewReports,
+      canApproveManagerStep,
+      canApproveFinanceStep,
       canViewProducts: formData.get("canViewProducts") === "on" || editProducts,
       canEditProducts: editProducts,
       canViewDiscounts: formData.get("canViewDiscounts") === "on" || editDiscounts,

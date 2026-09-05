@@ -379,7 +379,7 @@ async function main() {
     const repForQuote = pick(reps);
     const ageDays = randInt(1, 180);
     const createdAt = daysAgo(ageDays);
-    const status = pickWeighted(STATUS_WEIGHTS);
+    let status = pickWeighted(STATUS_WEIGHTS);
 
     const lineCount = randInt(1, 4);
     const linePool = shuffle([...hardwareProducts, ...serviceProducts, ...subscriptionProducts]).slice(0, lineCount);
@@ -400,6 +400,15 @@ async function main() {
       customer.tier,
       getCeiling,
     );
+
+    // A quote whose lines never actually crossed a discount ceiling
+    // wouldn't have landed in Pending Approval in the real flow -- it
+    // auto-approves the instant it's submitted. Keep the label honest.
+    const needsApproval = riskResult.riskScore > 0;
+    const requirement = needsApproval ? resolveApprovalRequirement(riskResult.riskScore, approvalRules) : null;
+    if (status === "PENDING_APPROVAL" && !(requirement?.requiresManager || requirement?.requiresFinance)) {
+      status = "APPROVED";
+    }
 
     const quotation = await db.quotation.create({
       data: {
@@ -433,20 +442,24 @@ async function main() {
 
     await db.auditLog.create({ data: { entityType: "Quotation", entityId: quotation.id, action: "CREATED", userId: repForQuote.id } });
 
-    const needsApproval = riskResult.riskScore > 0;
-    const requirement = needsApproval ? resolveApprovalRequirement(riskResult.riskScore, approvalRules) : null;
     const pastApprovalStage = status === "APPROVED" || status === "UNDER_NEGOTIATION" || status === "CONFIRMED" || status === "FULFILLED";
+    // A Pending Approval row should still have something genuinely
+    // waiting on it. Manager gets pre-approved for demo variety only when
+    // there's a Finance step left behind it to actually be pending --
+    // otherwise this was the only step, and it has to stay Pending.
+    const managerPreApproved = pastApprovalStage || (status === "PENDING_APPROVAL" && Boolean(requirement?.requiresFinance));
 
     if (needsApproval && requirement && (requirement.requiresManager || requirement.requiresFinance)) {
       let seq = 1;
       if (requirement.requiresManager) {
+        const managerStepStatus = status === "REJECTED" ? "REJECTED" : managerPreApproved ? "APPROVED" : "PENDING";
         await db.approvalStep.create({
           data: {
             quotationId: quotation.id,
             level: "MANAGER",
             sequence: seq++,
-            status: status === "REJECTED" ? "REJECTED" : pastApprovalStage || status === "PENDING_APPROVAL" ? "APPROVED" : "PENDING",
-            reviewerId: manager.id,
+            status: managerStepStatus,
+            reviewerId: managerStepStatus === "PENDING" ? null : manager.id,
             decidedAt: pastApprovalStage ? createdAt : null,
           },
         });

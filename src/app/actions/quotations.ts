@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireInternalUser, requireRole } from "@/lib/guards";
+import { requireInternalUser, requireRole, requireApprovalAuthority } from "@/lib/guards";
 import {
   computeAndPersistRiskScore,
   computeVolumeBonus,
@@ -159,53 +159,101 @@ export async function submitForApprovalAction(formData: FormData) {
   revalidatePath(`/workspace/quotations/${quotationId}`);
 }
 
-export async function decideApprovalAction(formData: FormData) {
-  const user = await requireRole(["SALES_MANAGER", "FINANCE", "ADMIN"]);
+export type ApprovalDecisionState = {
+  status: "idle" | "success" | "error";
+  message?: string;
+  variant?: "success" | "danger" | "info";
+};
+
+/**
+ * The UI only ever shows the next pending step's buttons to someone with
+ * the right authority, but that's just presentation -- a step id can be
+ * submitted directly, so every one of those constraints (step still
+ * pending, in-sequence, caller actually authorized for its level) is
+ * re-checked here, server-side, before anything is written.
+ */
+export async function decideApprovalAction(
+  _prevState: ApprovalDecisionState,
+  formData: FormData,
+): Promise<ApprovalDecisionState> {
   const stepId = String(formData.get("stepId"));
   const quotationId = String(formData.get("quotationId"));
-  const decision = String(formData.get("decision")) as
-    | "APPROVED"
-    | "REJECTED"
-    | "RETURNED";
+  const decision = String(formData.get("decision")) as "APPROVED" | "REJECTED" | "RETURNED";
   const reason = String(formData.get("reason") ?? "");
+
+  const step = await db.approvalStep.findUnique({ where: { id: stepId } });
+  if (!step || step.quotationId !== quotationId) {
+    return { status: "error", message: "This approval step no longer exists.", variant: "danger" };
+  }
+  if (step.status !== "PENDING") {
+    return { status: "error", message: "This step was already decided.", variant: "danger" };
+  }
+
+  const nextPending = await db.approvalStep.findFirst({
+    where: { quotationId, status: "PENDING" },
+    orderBy: { sequence: "asc" },
+  });
+  if (nextPending?.id !== step.id) {
+    return {
+      status: "error",
+      message: "An earlier approval step is still pending — steps must be decided in order.",
+      variant: "danger",
+    };
+  }
+
+  const user = await requireApprovalAuthority(step.level);
+  const levelLabel = step.level === "MANAGER" ? "Manager" : "Finance";
 
   await db.approvalStep.update({
     where: { id: stepId },
     data: { status: decision, reviewerId: user.userId, reason, decidedAt: new Date() },
   });
-  await logAudit(
-    "Quotation",
-    quotationId,
-    `APPROVAL_${decision}`,
-    user.userId,
-    reason || undefined,
-  );
+  await logAudit("Quotation", quotationId, `APPROVAL_${decision}`, user.userId, reason || undefined);
 
   if (decision === "REJECTED") {
     await db.quotation.update({
       where: { id: quotationId },
       data: { status: "REJECTED", lastActivityAt: new Date() },
     });
-  } else if (decision === "RETURNED") {
+    revalidatePath(`/workspace/quotations/${quotationId}`);
+    return {
+      status: "success",
+      message: `Quotation rejected at the ${levelLabel} step.`,
+      variant: "danger",
+    };
+  }
+
+  if (decision === "RETURNED") {
     await db.quotation.update({
       where: { id: quotationId },
       data: { status: "DRAFT", lastActivityAt: new Date() },
     });
     await db.approvalStep.deleteMany({ where: { quotationId } });
-  } else {
-    const remaining = await db.approvalStep.count({
-      where: { quotationId, status: "PENDING" },
+    revalidatePath(`/workspace/quotations/${quotationId}`);
+    return { status: "success", message: "Returned to the rep for revision.", variant: "info" };
+  }
+
+  const remaining = await db.approvalStep.count({ where: { quotationId, status: "PENDING" } });
+  if (remaining === 0) {
+    await db.quotation.update({
+      where: { id: quotationId },
+      data: { status: "APPROVED", lastActivityAt: new Date() },
     });
-    if (remaining === 0) {
-      await db.quotation.update({
-        where: { id: quotationId },
-        data: { status: "APPROVED", lastActivityAt: new Date() },
-      });
-      await generateFulfillmentAndBilling(quotationId);
-    }
+    await generateFulfillmentAndBilling(quotationId);
+    revalidatePath(`/workspace/quotations/${quotationId}`);
+    return {
+      status: "success",
+      message: "Quotation approved. Fulfillment split and billing schedule have been generated.",
+      variant: "success",
+    };
   }
 
   revalidatePath(`/workspace/quotations/${quotationId}`);
+  return {
+    status: "success",
+    message: `${levelLabel} approval recorded. Awaiting the next approval step.`,
+    variant: "success",
+  };
 }
 
 export async function nudgeQuotationAction(formData: FormData) {

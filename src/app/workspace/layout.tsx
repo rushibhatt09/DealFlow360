@@ -1,11 +1,17 @@
-import { requireInternalUser, getFeatureFlags } from "@/lib/guards";
+import { requireInternalUser, getFeatureFlags, ADMIN_SECTIONS } from "@/lib/guards";
 import { logoutAction } from "@/app/actions/auth";
 import { AppShell, type NavItem } from "@/components/app-shell";
 
 export default async function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const user = await requireInternalUser();
   const flags = await getFeatureFlags(user.userId);
-  const canSeeAdmin = user.role === "ADMIN" || user.role === "SALES_MANAGER";
+  // Mirrors admin/layout.tsx's own gate -- the nav link should show
+  // whenever a visit to /admin would actually go somewhere, not just for
+  // the two roles that used to be hardcoded here.
+  const canSeeAdmin =
+    user.role === "ADMIN" ||
+    flags.canViewReports ||
+    Object.values(ADMIN_SECTIONS).some((s) => flags[s.view] || flags[s.edit]);
 
   const navItems: NavItem[] = [
     { href: "/workspace/quotations", label: "Quotations", icon: "file-text", matchExact: true },
