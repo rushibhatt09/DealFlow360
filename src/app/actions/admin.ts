@@ -3,6 +3,100 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/guards";
+import { hashPassword } from "@/lib/auth";
+import { logAudit } from "@/lib/quotation-service";
+
+const USER_ROLES = ["SALES_REP", "SALES_MANAGER", "FINANCE", "ADMIN"] as const;
+
+export async function createInternalUserAction(formData: FormData) {
+  const admin = await requireRole(["ADMIN"]);
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const role = String(formData.get("role")) as (typeof USER_ROLES)[number];
+
+  if (!name || !email || password.length < 6 || !USER_ROLES.includes(role)) {
+    return;
+  }
+
+  const user = await db.user.create({
+    data: { name, email, passwordHash: await hashPassword(password), role },
+  });
+  await logAudit("User", user.id, "USER_CREATED", admin.userId, `${name} (${role})`);
+  revalidatePath("/admin/users");
+}
+
+export async function updateInternalUserAction(formData: FormData) {
+  const admin = await requireRole(["ADMIN"]);
+  const userId = String(formData.get("userId"));
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const role = String(formData.get("role")) as (typeof USER_ROLES)[number];
+
+  if (!name || !email || !USER_ROLES.includes(role)) return;
+
+  await db.user.update({ where: { id: userId }, data: { name, email, role } });
+  await logAudit("User", userId, "USER_UPDATED", admin.userId, `${name} -> ${role}`);
+  revalidatePath("/admin/users");
+}
+
+export async function resetInternalUserPasswordAction(formData: FormData) {
+  const admin = await requireRole(["ADMIN"]);
+  const userId = String(formData.get("userId"));
+  const newPassword = String(formData.get("newPassword") ?? "");
+  if (newPassword.length < 6) return;
+
+  await db.user.update({
+    where: { id: userId },
+    data: { passwordHash: await hashPassword(newPassword) },
+  });
+  await logAudit("User", userId, "PASSWORD_RESET", admin.userId);
+  revalidatePath("/admin/users");
+}
+
+export async function createCustomerAction(formData: FormData) {
+  const admin = await requireRole(["ADMIN", "SALES_MANAGER"]);
+  const name = String(formData.get("name") ?? "").trim();
+  const portalEmail = String(formData.get("portalEmail") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const tier = String(formData.get("tier")) as "BRONZE" | "SILVER" | "GOLD";
+
+  if (!name || !portalEmail || password.length < 6) return;
+
+  const customer = await db.customer.create({
+    data: { name, tier, portalEmail, portalPasswordHash: await hashPassword(password) },
+  });
+  await logAudit("Customer", customer.id, "CUSTOMER_CREATED", admin.userId, name);
+  revalidatePath("/admin/customers");
+}
+
+export async function updateCustomerAction(formData: FormData) {
+  const admin = await requireRole(["ADMIN", "SALES_MANAGER"]);
+  const customerId = String(formData.get("customerId"));
+  const name = String(formData.get("name") ?? "").trim();
+  const portalEmail = String(formData.get("portalEmail") ?? "").trim().toLowerCase();
+  const tier = String(formData.get("tier")) as "BRONZE" | "SILVER" | "GOLD";
+
+  if (!name || !portalEmail) return;
+
+  await db.customer.update({ where: { id: customerId }, data: { name, portalEmail, tier } });
+  await logAudit("Customer", customerId, "CUSTOMER_UPDATED", admin.userId, `${name} -> ${tier}`);
+  revalidatePath("/admin/customers");
+}
+
+export async function resetCustomerPasswordAction(formData: FormData) {
+  const admin = await requireRole(["ADMIN", "SALES_MANAGER"]);
+  const customerId = String(formData.get("customerId"));
+  const newPassword = String(formData.get("newPassword") ?? "");
+  if (newPassword.length < 6) return;
+
+  await db.customer.update({
+    where: { id: customerId },
+    data: { portalPasswordHash: await hashPassword(newPassword) },
+  });
+  await logAudit("Customer", customerId, "PORTAL_PASSWORD_RESET", admin.userId);
+  revalidatePath("/admin/customers");
+}
 
 export async function createProductAction(formData: FormData) {
   await requireRole(["ADMIN", "SALES_MANAGER"]);

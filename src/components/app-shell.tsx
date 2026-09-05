@@ -15,6 +15,8 @@ import {
   Repeat,
   Sparkles,
   BarChart3,
+  Users,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +32,8 @@ export const ICONS = {
   "bar-chart": BarChart3,
   "arrow-left": ArrowLeft,
   settings: Settings,
+  users: Users,
+  building: Building2,
 } as const;
 
 export type IconKey = keyof typeof ICONS;
