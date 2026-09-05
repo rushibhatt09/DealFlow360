@@ -78,7 +78,8 @@ async function main() {
       // Matches her documented job: "configures discount tiers and approval
       // chains." Everything else in the admin backend she has to be
       // granted explicitly, same as anyone else.
-      canManageDiscounts: true,
+      canViewDiscounts: true,
+      canEditDiscounts: true,
     },
   });
   const finance = await db.user.create({

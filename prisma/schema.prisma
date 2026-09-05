@@ -93,16 +93,26 @@ model User {
   canViewDealHealth  Boolean @default(true)
   canSeeUpsellPanel  Boolean @default(true)
 
-  // Admin backend section access. ADMIN role bypasses these entirely
-  // (always full access); every other role starts locked out of all of
-  // them and an Admin grants sections one at a time. Users & Permissions
-  // itself has no toggle -- it's hardcoded Admin-only, on purpose.
-  canManageProducts      Boolean @default(false)
-  canManageDiscounts     Boolean @default(false)
-  canManageWarehouses    Boolean @default(false)
-  canManageSubscriptions Boolean @default(false)
-  canManageUpsellRules   Boolean @default(false)
-  canManageCustomers     Boolean @default(false)
+  // Admin backend section access, split into View (read-only) and Edit
+  // (can also create/change records) per section -- Edit without View
+  // makes no sense, so the server always treats Edit as implying View
+  // regardless of what's literally submitted. ADMIN role bypasses all of
+  // these (always full access); every other role starts locked out and
+  // an Admin grants view or edit one section at a time. Users &
+  // Permissions itself has no toggle -- it's hardcoded Admin-only.
+  // Reports has no Edit variant: there's nothing on that page to edit.
+  canViewProducts        Boolean @default(false)
+  canEditProducts        Boolean @default(false)
+  canViewDiscounts       Boolean @default(false)
+  canEditDiscounts       Boolean @default(false)
+  canViewWarehouses      Boolean @default(false)
+  canEditWarehouses      Boolean @default(false)
+  canViewSubscriptions   Boolean @default(false)
+  canEditSubscriptions   Boolean @default(false)
+  canViewUpsellRules     Boolean @default(false)
+  canEditUpsellRules     Boolean @default(false)
+  canViewCustomers       Boolean @default(false)
+  canEditCustomers       Boolean @default(false)
   canViewReports         Boolean @default(false)
 
   quotations     Quotation[]      @relation("RepQuotations")

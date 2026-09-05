@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireFeature } from "@/lib/guards";
+import { requireSectionView } from "@/lib/guards";
 import {
   createDiscountCeilingAction,
   createApprovalRuleAction,
@@ -16,7 +16,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/utils";
 
 export default async function DiscountTiersAdminPage() {
-  await requireFeature("canManageDiscounts");
+  const { canEdit } = await requireSectionView("discounts");
   const ceilings = await db.discountCeiling.findMany({ orderBy: [{ tier: "asc" }, { category: "asc" }] });
   const rules = await db.approvalRule.findMany({ orderBy: { minScore: "asc" } });
   const volumeRules = await db.volumeDiscountRule.findMany({ orderBy: { minLineValue: "asc" } });
@@ -33,25 +33,27 @@ export default async function DiscountTiersAdminPage() {
           <CardTitle>Discount Ceilings (by tier &amp; category)</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={createDiscountCeilingAction} className="mb-4 flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label>Tier</Label>
-              <Select name="tier" className="w-32">
-                <option>BRONZE</option>
-                <option>SILVER</option>
-                <option>GOLD</option>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Category (or ALL)</Label>
-              <Input name="category" required className="w-40" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Max %</Label>
-              <Input name="maxDiscountPct" type="number" step="0.1" required className="w-24" />
-            </div>
-            <Button type="submit">Save Ceiling</Button>
-          </form>
+          {canEdit && (
+            <form action={createDiscountCeilingAction} className="mb-4 flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label>Tier</Label>
+                <Select name="tier" className="w-32">
+                  <option>BRONZE</option>
+                  <option>SILVER</option>
+                  <option>GOLD</option>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Category (or ALL)</Label>
+                <Input name="category" required className="w-40" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Max %</Label>
+                <Input name="maxDiscountPct" type="number" step="0.1" required className="w-24" />
+              </div>
+              <Button type="submit">Save Ceiling</Button>
+            </form>
+          )}
           <Table>
             <TableHeader>
               <TableRow>
@@ -80,23 +82,25 @@ export default async function DiscountTiersAdminPage() {
           <CardTitle>Approval Chain Rules (by blended risk score)</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={createApprovalRuleAction} className="mb-4 flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label>Min score</Label>
-              <Input name="minScore" type="number" step="0.1" required className="w-24" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Max score (blank = no limit)</Label>
-              <Input name="maxScore" type="number" step="0.1" className="w-28" />
-            </div>
-            <label className="flex items-center gap-1.5 pb-2 text-sm text-foreground">
-              <input type="checkbox" name="requiresManager" defaultChecked className="accent-primary" /> Manager
-            </label>
-            <label className="flex items-center gap-1.5 pb-2 text-sm text-foreground">
-              <input type="checkbox" name="requiresFinance" className="accent-primary" /> Finance
-            </label>
-            <Button type="submit">Add Rule</Button>
-          </form>
+          {canEdit && (
+            <form action={createApprovalRuleAction} className="mb-4 flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label>Min score</Label>
+                <Input name="minScore" type="number" step="0.1" required className="w-24" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Max score (blank = no limit)</Label>
+                <Input name="maxScore" type="number" step="0.1" className="w-28" />
+              </div>
+              <label className="flex items-center gap-1.5 pb-2 text-sm text-foreground">
+                <input type="checkbox" name="requiresManager" defaultChecked className="accent-primary" /> Manager
+              </label>
+              <label className="flex items-center gap-1.5 pb-2 text-sm text-foreground">
+                <input type="checkbox" name="requiresFinance" className="accent-primary" /> Finance
+              </label>
+              <Button type="submit">Add Rule</Button>
+            </form>
+          )}
           <Table>
             <TableHeader>
               <TableRow>
@@ -129,17 +133,19 @@ export default async function DiscountTiersAdminPage() {
           </p>
         </CardHeader>
         <CardContent>
-          <form action={createVolumeDiscountRuleAction} className="mb-4 flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label>Min line value (₹)</Label>
-              <Input name="minLineValue" type="number" step="1" required className="w-32" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Bonus discount %</Label>
-              <Input name="bonusDiscountPct" type="number" step="0.1" required className="w-32" />
-            </div>
-            <Button type="submit">Add Volume Rule</Button>
-          </form>
+          {canEdit && (
+            <form action={createVolumeDiscountRuleAction} className="mb-4 flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label>Min line value (₹)</Label>
+                <Input name="minLineValue" type="number" step="1" required className="w-32" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Bonus discount %</Label>
+                <Input name="bonusDiscountPct" type="number" step="0.1" required className="w-32" />
+              </div>
+              <Button type="submit">Add Volume Rule</Button>
+            </form>
+          )}
           <Table>
             <TableHeader>
               <TableRow>

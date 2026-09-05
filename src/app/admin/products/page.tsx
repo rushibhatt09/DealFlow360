@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireFeature } from "@/lib/guards";
+import { requireSectionView } from "@/lib/guards";
 import { createProductAction } from "@/app/actions/admin";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,7 +21,7 @@ export default async function ProductsAdminPage({
 }: {
   searchParams: Promise<{ q?: string; category?: string }>;
 }) {
-  await requireFeature("canManageProducts");
+  const { canEdit } = await requireSectionView("products");
   const { q, category } = await searchParams;
   const where: Prisma.ProductWhereInput = {};
   if (q) where.name = { contains: q };
@@ -36,41 +36,43 @@ export default async function ProductsAdminPage({
         description={`${products.length} product${products.length === 1 ? "" : "s"} in the catalog.`}
       />
 
-      <Card>
-        <CardContent className="pt-5">
-          <form action={createProductAction} className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label>Name</Label>
-              <Input name="name" required className="w-44" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Category</Label>
-              <Select name="category" className="w-36">
-                {CATEGORIES.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Price</Label>
-              <Input name="unitPrice" type="number" step="0.01" required className="w-24" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Cost</Label>
-              <Input name="unitCost" type="number" step="0.01" required className="w-24" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Unit</Label>
-              <Input name="unit" defaultValue="unit" className="w-20" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Tax %</Label>
-              <Input name="taxPct" type="number" step="0.01" defaultValue={0} className="w-20" />
-            </div>
-            <Button type="submit">Add Product</Button>
-          </form>
-        </CardContent>
-      </Card>
+      {canEdit && (
+        <Card>
+          <CardContent className="pt-5">
+            <form action={createProductAction} className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label>Name</Label>
+                <Input name="name" required className="w-44" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <Select name="category" className="w-36">
+                  {CATEGORIES.map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Price</Label>
+                <Input name="unitPrice" type="number" step="0.01" required className="w-24" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Cost</Label>
+                <Input name="unitCost" type="number" step="0.01" required className="w-24" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Unit</Label>
+                <Input name="unit" defaultValue="unit" className="w-20" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Tax %</Label>
+                <Input name="taxPct" type="number" step="0.01" defaultValue={0} className="w-20" />
+              </div>
+              <Button type="submit">Add Product</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="p-4">
         <form className="flex flex-wrap items-end gap-3">

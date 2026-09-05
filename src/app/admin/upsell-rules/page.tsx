@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireFeature } from "@/lib/guards";
+import { requireSectionView } from "@/lib/guards";
 import { createUpsellRuleAction } from "@/app/actions/admin";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export default async function UpsellRulesAdminPage() {
-  await requireFeature("canManageUpsellRules");
+  const { canEdit } = await requireSectionView("upsellRules");
   const rules = await db.upsellRule.findMany({ include: { baseProduct: true, suggestedProduct: true } });
   const products = await db.product.findMany({ orderBy: { name: "asc" } });
 
@@ -22,40 +22,42 @@ export default async function UpsellRulesAdminPage() {
         description="Product pairings that surface as suggestions while a rep builds a quote."
       />
 
-      <Card>
-        <CardContent className="pt-5">
-          <form action={createUpsellRuleAction} className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label>When cart has</Label>
-              <Select name="baseProductId" className="w-48">
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Suggest</Label>
-              <Select name="suggestedProductId" className="w-48">
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Min margin %</Label>
-              <Input name="minMarginPct" type="number" defaultValue={0} className="w-24" />
-            </div>
-            <label className="flex items-center gap-1.5 pb-2 text-sm text-foreground">
-              <input type="checkbox" name="promoted" className="accent-primary" /> Promoted
-            </label>
-            <Button type="submit">Add Rule</Button>
-          </form>
-        </CardContent>
-      </Card>
+      {canEdit && (
+        <Card>
+          <CardContent className="pt-5">
+            <form action={createUpsellRuleAction} className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label>When cart has</Label>
+                <Select name="baseProductId" className="w-48">
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Suggest</Label>
+                <Select name="suggestedProductId" className="w-48">
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Min margin %</Label>
+                <Input name="minMarginPct" type="number" defaultValue={0} className="w-24" />
+              </div>
+              <label className="flex items-center gap-1.5 pb-2 text-sm text-foreground">
+                <input type="checkbox" name="promoted" className="accent-primary" /> Promoted
+              </label>
+              <Button type="submit">Add Rule</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <Table>

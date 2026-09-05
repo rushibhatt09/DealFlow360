@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireFeature } from "@/lib/guards";
+import { requireSectionView } from "@/lib/guards";
 import { createSubscriptionPlanAction } from "@/app/actions/admin";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export default async function SubscriptionPlansAdminPage() {
-  await requireFeature("canManageSubscriptions");
+  const { canEdit } = await requireSectionView("subscriptions");
   const plans = await db.subscriptionPlan.findMany();
 
   return (
@@ -21,29 +21,31 @@ export default async function SubscriptionPlansAdminPage() {
         description="Recurring plans that can be attached to specific products."
       />
 
-      <Card>
-        <CardContent className="pt-5">
-          <form action={createSubscriptionPlanAction} className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label>Name</Label>
-              <Input name="name" required className="w-48" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Interval</Label>
-              <Select name="interval" className="w-36">
-                <option>MONTHLY</option>
-                <option>QUARTERLY</option>
-                <option>YEARLY</option>
-              </Select>
-            </div>
-            <label className="flex items-center gap-1.5 pb-2 text-sm text-foreground">
-              <input type="checkbox" name="prorationEnabled" defaultChecked className="accent-primary" /> Proration
-              enabled
-            </label>
-            <Button type="submit">Add Plan</Button>
-          </form>
-        </CardContent>
-      </Card>
+      {canEdit && (
+        <Card>
+          <CardContent className="pt-5">
+            <form action={createSubscriptionPlanAction} className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label>Name</Label>
+                <Input name="name" required className="w-48" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Interval</Label>
+                <Select name="interval" className="w-36">
+                  <option>MONTHLY</option>
+                  <option>QUARTERLY</option>
+                  <option>YEARLY</option>
+                </Select>
+              </div>
+              <label className="flex items-center gap-1.5 pb-2 text-sm text-foreground">
+                <input type="checkbox" name="prorationEnabled" defaultChecked className="accent-primary" /> Proration
+                enabled
+              </label>
+              <Button type="submit">Add Plan</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <Table>

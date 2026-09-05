@@ -17,12 +17,18 @@ const FEATURE_SELECT = {
   canViewPipeline: true,
   canViewDealHealth: true,
   canSeeUpsellPanel: true,
-  canManageProducts: true,
-  canManageDiscounts: true,
-  canManageWarehouses: true,
-  canManageSubscriptions: true,
-  canManageUpsellRules: true,
-  canManageCustomers: true,
+  canViewProducts: true,
+  canEditProducts: true,
+  canViewDiscounts: true,
+  canEditDiscounts: true,
+  canViewWarehouses: true,
+  canEditWarehouses: true,
+  canViewSubscriptions: true,
+  canEditSubscriptions: true,
+  canViewUpsellRules: true,
+  canEditUpsellRules: true,
+  canViewCustomers: true,
+  canEditCustomers: true,
   canViewReports: true,
 } as const;
 
@@ -54,6 +60,58 @@ export async function getFeatureFlags(userId: string) {
     where: { id: userId },
     select: FEATURE_SELECT,
   });
+}
+
+/** Admin backend sections that distinguish View (read-only) from Edit. */
+export const ADMIN_SECTIONS = {
+  products: { view: "canViewProducts", edit: "canEditProducts" },
+  discounts: { view: "canViewDiscounts", edit: "canEditDiscounts" },
+  warehouses: { view: "canViewWarehouses", edit: "canEditWarehouses" },
+  subscriptions: { view: "canViewSubscriptions", edit: "canEditSubscriptions" },
+  upsellRules: { view: "canViewUpsellRules", edit: "canEditUpsellRules" },
+  customers: { view: "canViewCustomers", edit: "canEditCustomers" },
+} as const satisfies Record<string, { view: FeatureFlag; edit: FeatureFlag }>;
+
+export type AdminSection = keyof typeof ADMIN_SECTIONS;
+
+/**
+ * Gates entry to an admin section page. Grants entry on View OR Edit,
+ * and hands back whether this visit is edit-capable so the page can
+ * decide whether to render its create/change forms at all -- a
+ * view-only user should see the data, never the controls to change it.
+ */
+export async function requireSectionView(
+  section: AdminSection,
+): Promise<InternalSessionData & { canEdit: boolean }> {
+  const user = await requireInternalUser();
+  const { view, edit } = ADMIN_SECTIONS[section];
+
+  if (user.role === "ADMIN") return { ...user, canEdit: true };
+
+  const flags = await db.user.findUniqueOrThrow({
+    where: { id: user.userId },
+    select: FEATURE_SELECT,
+  });
+  if (!flags[view] && !flags[edit]) redirect("/workspace/quotations");
+  return { ...user, canEdit: Boolean(flags[edit]) };
+}
+
+/**
+ * Gates the actual mutation -- used inside Server Actions as
+ * defense-in-depth, so a view-only user can't hit create/update
+ * endpoints directly even if they never see the button for it.
+ */
+export async function requireSectionEdit(section: AdminSection): Promise<InternalSessionData> {
+  const user = await requireInternalUser();
+  if (user.role === "ADMIN") return user;
+
+  const { edit } = ADMIN_SECTIONS[section];
+  const flags = await db.user.findUniqueOrThrow({
+    where: { id: user.userId },
+    select: FEATURE_SELECT,
+  });
+  if (!flags[edit]) redirect("/workspace/quotations");
+  return user;
 }
 
 export async function requireRole(

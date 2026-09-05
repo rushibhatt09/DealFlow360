@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireFeature } from "@/lib/guards";
+import { requireSectionView } from "@/lib/guards";
 import {
   createCustomerAction,
   updateCustomerAction,
@@ -24,7 +24,7 @@ export default async function CustomersAdminPage({
 }: {
   searchParams: Promise<{ q?: string; tier?: string }>;
 }) {
-  await requireFeature("canManageCustomers");
+  const { canEdit } = await requireSectionView("customers");
   const { q, tier } = await searchParams;
   const where: Prisma.CustomerWhereInput = {};
   if (q) where.name = { contains: q };
@@ -39,38 +39,40 @@ export default async function CustomersAdminPage({
         description={`${customers.length} account${customers.length === 1 ? "" : "s"} that can sign in to the customer negotiation portal.`}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Add Customer</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form action={createCustomerAction} className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label>Company Name</Label>
-              <Input name="name" required className="w-48" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Portal Email</Label>
-              <Input name="portalEmail" type="email" required className="w-52" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Portal Password</Label>
-              <Input name="password" type="password" required minLength={6} className="w-40" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Tier</Label>
-              <Select name="tier" className="w-32" defaultValue="BRONZE">
-                {TIERS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <Button type="submit">Create Customer</Button>
-          </form>
-        </CardContent>
-      </Card>
+      {canEdit && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Add Customer</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form action={createCustomerAction} className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label>Company Name</Label>
+                <Input name="name" required className="w-48" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Portal Email</Label>
+                <Input name="portalEmail" type="email" required className="w-52" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Portal Password</Label>
+                <Input name="password" type="password" required minLength={6} className="w-40" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Tier</Label>
+                <Select name="tier" className="w-32" defaultValue="BRONZE">
+                  {TIERS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Button type="submit">Create Customer</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="p-4">
         <form className="flex flex-wrap items-end gap-3">
@@ -117,49 +119,56 @@ export default async function CustomersAdminPage({
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 border-t border-border pt-4 md:grid-cols-2">
-              <form action={updateCustomerAction} className="flex flex-wrap items-end gap-2">
-                <input type="hidden" name="customerId" value={c.id} />
-                <div className="space-y-1">
-                  <Label className="text-xs">Name</Label>
-                  <Input name="name" defaultValue={c.name} className="h-8 w-32 text-xs" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Portal Email</Label>
-                  <Input name="portalEmail" type="email" defaultValue={c.portalEmail} className="h-8 w-40 text-xs" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Tier</Label>
-                  <Select name="tier" defaultValue={c.tier} className="h-8 w-28 text-xs">
-                    {TIERS.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <Button type="submit" size="sm" variant="outline">
-                  Save
-                </Button>
-              </form>
+            {canEdit && (
+              <div className="mt-4 grid grid-cols-1 gap-3 border-t border-border pt-4 md:grid-cols-2">
+                <form action={updateCustomerAction} className="flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="customerId" value={c.id} />
+                  <div className="space-y-1">
+                    <Label className="text-xs">Name</Label>
+                    <Input name="name" defaultValue={c.name} className="h-8 w-32 text-xs" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Portal Email</Label>
+                    <Input
+                      name="portalEmail"
+                      type="email"
+                      defaultValue={c.portalEmail}
+                      className="h-8 w-40 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tier</Label>
+                    <Select name="tier" defaultValue={c.tier} className="h-8 w-28 text-xs">
+                      {TIERS.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <Button type="submit" size="sm" variant="outline">
+                    Save
+                  </Button>
+                </form>
 
-              <form action={resetCustomerPasswordAction} className="flex flex-wrap items-end gap-2">
-                <input type="hidden" name="customerId" value={c.id} />
-                <div className="space-y-1">
-                  <Label className="text-xs">New portal password</Label>
-                  <Input
-                    name="newPassword"
-                    type="password"
-                    minLength={6}
-                    placeholder="min. 6 characters"
-                    className="h-8 w-44 text-xs"
-                  />
-                </div>
-                <Button type="submit" size="sm" variant="outline">
-                  Reset Password
-                </Button>
-              </form>
-            </div>
+                <form action={resetCustomerPasswordAction} className="flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="customerId" value={c.id} />
+                  <div className="space-y-1">
+                    <Label className="text-xs">New portal password</Label>
+                    <Input
+                      name="newPassword"
+                      type="password"
+                      minLength={6}
+                      placeholder="min. 6 characters"
+                      className="h-8 w-44 text-xs"
+                    />
+                  </div>
+                  <Button type="submit" size="sm" variant="outline">
+                    Reset Password
+                  </Button>
+                </form>
+              </div>
+            )}
           </Card>
         ))}
       </div>

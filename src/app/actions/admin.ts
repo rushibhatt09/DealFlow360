@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireRole, requireFeature } from "@/lib/guards";
+import { requireRole, requireSectionEdit } from "@/lib/guards";
 import { hashPassword } from "@/lib/auth";
 import { logAudit } from "@/lib/quotation-service";
 
@@ -35,13 +35,16 @@ export async function updateInternalUserAction(formData: FormData) {
   const canViewPipeline = formData.get("canViewPipeline") === "on";
   const canViewDealHealth = formData.get("canViewDealHealth") === "on";
   const canSeeUpsellPanel = formData.get("canSeeUpsellPanel") === "on";
-  const canManageProducts = formData.get("canManageProducts") === "on";
-  const canManageDiscounts = formData.get("canManageDiscounts") === "on";
-  const canManageWarehouses = formData.get("canManageWarehouses") === "on";
-  const canManageSubscriptions = formData.get("canManageSubscriptions") === "on";
-  const canManageUpsellRules = formData.get("canManageUpsellRules") === "on";
-  const canManageCustomers = formData.get("canManageCustomers") === "on";
   const canViewReports = formData.get("canViewReports") === "on";
+
+  // Edit implies View regardless of what was literally submitted -- an
+  // edit-only, can't-see-the-list state makes no sense to allow.
+  const editProducts = formData.get("canEditProducts") === "on";
+  const editDiscounts = formData.get("canEditDiscounts") === "on";
+  const editWarehouses = formData.get("canEditWarehouses") === "on";
+  const editSubscriptions = formData.get("canEditSubscriptions") === "on";
+  const editUpsellRules = formData.get("canEditUpsellRules") === "on";
+  const editCustomers = formData.get("canEditCustomers") === "on";
 
   if (!name || !email || !USER_ROLES.includes(role)) return;
 
@@ -54,13 +57,19 @@ export async function updateInternalUserAction(formData: FormData) {
       canViewPipeline,
       canViewDealHealth,
       canSeeUpsellPanel,
-      canManageProducts,
-      canManageDiscounts,
-      canManageWarehouses,
-      canManageSubscriptions,
-      canManageUpsellRules,
-      canManageCustomers,
       canViewReports,
+      canViewProducts: formData.get("canViewProducts") === "on" || editProducts,
+      canEditProducts: editProducts,
+      canViewDiscounts: formData.get("canViewDiscounts") === "on" || editDiscounts,
+      canEditDiscounts: editDiscounts,
+      canViewWarehouses: formData.get("canViewWarehouses") === "on" || editWarehouses,
+      canEditWarehouses: editWarehouses,
+      canViewSubscriptions: formData.get("canViewSubscriptions") === "on" || editSubscriptions,
+      canEditSubscriptions: editSubscriptions,
+      canViewUpsellRules: formData.get("canViewUpsellRules") === "on" || editUpsellRules,
+      canEditUpsellRules: editUpsellRules,
+      canViewCustomers: formData.get("canViewCustomers") === "on" || editCustomers,
+      canEditCustomers: editCustomers,
     },
   });
   await logAudit("User", userId, "USER_UPDATED", admin.userId, `${name} -> ${role}`);
@@ -83,7 +92,7 @@ export async function resetInternalUserPasswordAction(formData: FormData) {
 }
 
 export async function createCustomerAction(formData: FormData) {
-  const admin = await requireFeature("canManageCustomers");
+  const admin = await requireSectionEdit("customers");
   const name = String(formData.get("name") ?? "").trim();
   const portalEmail = String(formData.get("portalEmail") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
@@ -99,7 +108,7 @@ export async function createCustomerAction(formData: FormData) {
 }
 
 export async function updateCustomerAction(formData: FormData) {
-  const admin = await requireFeature("canManageCustomers");
+  const admin = await requireSectionEdit("customers");
   const customerId = String(formData.get("customerId"));
   const name = String(formData.get("name") ?? "").trim();
   const portalEmail = String(formData.get("portalEmail") ?? "").trim().toLowerCase();
@@ -113,7 +122,7 @@ export async function updateCustomerAction(formData: FormData) {
 }
 
 export async function resetCustomerPasswordAction(formData: FormData) {
-  const admin = await requireFeature("canManageCustomers");
+  const admin = await requireSectionEdit("customers");
   const customerId = String(formData.get("customerId"));
   const newPassword = String(formData.get("newPassword") ?? "");
   if (newPassword.length < 6) return;
@@ -127,7 +136,7 @@ export async function resetCustomerPasswordAction(formData: FormData) {
 }
 
 export async function createProductAction(formData: FormData) {
-  await requireFeature("canManageProducts");
+  await requireSectionEdit("products");
   await db.product.create({
     data: {
       name: String(formData.get("name")),
@@ -142,7 +151,7 @@ export async function createProductAction(formData: FormData) {
 }
 
 export async function createWarehouseAction(formData: FormData) {
-  await requireFeature("canManageWarehouses");
+  await requireSectionEdit("warehouses");
   await db.warehouse.create({
     data: {
       name: String(formData.get("name")),
@@ -153,7 +162,7 @@ export async function createWarehouseAction(formData: FormData) {
 }
 
 export async function setStockAction(formData: FormData) {
-  await requireFeature("canManageWarehouses");
+  await requireSectionEdit("warehouses");
   const warehouseId = String(formData.get("warehouseId"));
   const productId = String(formData.get("productId"));
   const qty = Number(formData.get("qty"));
@@ -167,7 +176,7 @@ export async function setStockAction(formData: FormData) {
 }
 
 export async function createDiscountCeilingAction(formData: FormData) {
-  await requireFeature("canManageDiscounts");
+  await requireSectionEdit("discounts");
   const tier = String(formData.get("tier")) as "BRONZE" | "SILVER" | "GOLD";
   const category = String(formData.get("category"));
   const maxDiscountPct = Number(formData.get("maxDiscountPct"));
@@ -181,7 +190,7 @@ export async function createDiscountCeilingAction(formData: FormData) {
 }
 
 export async function createApprovalRuleAction(formData: FormData) {
-  await requireFeature("canManageDiscounts");
+  await requireSectionEdit("discounts");
   const minScore = Number(formData.get("minScore"));
   const maxScoreRaw = formData.get("maxScore");
   await db.approvalRule.create({
@@ -196,7 +205,7 @@ export async function createApprovalRuleAction(formData: FormData) {
 }
 
 export async function createSubscriptionPlanAction(formData: FormData) {
-  await requireFeature("canManageSubscriptions");
+  await requireSectionEdit("subscriptions");
   await db.subscriptionPlan.create({
     data: {
       name: String(formData.get("name")),
@@ -208,7 +217,7 @@ export async function createSubscriptionPlanAction(formData: FormData) {
 }
 
 export async function createUpsellRuleAction(formData: FormData) {
-  await requireFeature("canManageUpsellRules");
+  await requireSectionEdit("upsellRules");
   await db.upsellRule.create({
     data: {
       baseProductId: String(formData.get("baseProductId")),
@@ -221,7 +230,7 @@ export async function createUpsellRuleAction(formData: FormData) {
 }
 
 export async function createVolumeDiscountRuleAction(formData: FormData) {
-  await requireFeature("canManageDiscounts");
+  await requireSectionEdit("discounts");
   const minLineValue = Number(formData.get("minLineValue"));
   const bonusDiscountPct = Number(formData.get("bonusDiscountPct"));
   if (!Number.isFinite(minLineValue) || !Number.isFinite(bonusDiscountPct)) return;

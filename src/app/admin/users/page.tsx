@@ -103,19 +103,34 @@ export default async function UsersAdminPage() {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Role</Label>
-                      <Select
-                        name="role"
-                        defaultValue={u.role}
-                        disabled={isSelf}
-                        title={isSelf ? "You can't change your own role" : undefined}
-                        className="h-8 w-36 text-xs"
-                      >
-                        {ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {r.replaceAll("_", " ")}
-                          </option>
-                        ))}
-                      </Select>
+                      {isSelf ? (
+                        <>
+                          {/* A disabled field is excluded from form submission entirely, so the
+                              real value travels via this hidden input instead -- the visible
+                              select below is purely a "you can't change this" display. */}
+                          <input type="hidden" name="role" value={u.role} />
+                          <Select
+                            defaultValue={u.role}
+                            disabled
+                            title="You can't change your own role"
+                            className="h-8 w-36 text-xs"
+                          >
+                            {ROLES.map((r) => (
+                              <option key={r} value={r}>
+                                {r.replaceAll("_", " ")}
+                              </option>
+                            ))}
+                          </Select>
+                        </>
+                      ) : (
+                        <Select name="role" defaultValue={u.role} className="h-8 w-36 text-xs">
+                          {ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {r.replaceAll("_", " ")}
+                            </option>
+                          ))}
+                        </Select>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-md bg-muted/50 px-3 py-2">
@@ -132,21 +147,50 @@ export default async function UsersAdminPage() {
                       Admin role always has full backend access — nothing to toggle here.
                     </p>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-md bg-muted/50 px-3 py-2">
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Admin backend
-                      </span>
-                      <Switch name="canManageProducts" defaultChecked={u.canManageProducts} label="Products" />
-                      <Switch name="canManageDiscounts" defaultChecked={u.canManageDiscounts} label="Discount & Approval" />
-                      <Switch name="canManageWarehouses" defaultChecked={u.canManageWarehouses} label="Warehouses" />
-                      <Switch
-                        name="canManageSubscriptions"
-                        defaultChecked={u.canManageSubscriptions}
-                        label="Subscription Plans"
-                      />
-                      <Switch name="canManageUpsellRules" defaultChecked={u.canManageUpsellRules} label="Upsell Rules" />
-                      <Switch name="canManageCustomers" defaultChecked={u.canManageCustomers} label="Customers" />
-                      <Switch name="canViewReports" defaultChecked={u.canViewReports} label="Reports" />
+                    <div className="rounded-md bg-muted/50 px-3 py-2">
+                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Admin backend — View shows the data, Edit allows changes
+                      </p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-left text-muted-foreground">
+                              <th className="py-1 pr-4 font-medium">Section</th>
+                              <th className="px-2 py-1 font-medium">View</th>
+                              <th className="px-2 py-1 font-medium">Edit</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(
+                              [
+                                ["Products", "canViewProducts", "canEditProducts"],
+                                ["Discount & Approval", "canViewDiscounts", "canEditDiscounts"],
+                                ["Warehouses", "canViewWarehouses", "canEditWarehouses"],
+                                ["Subscription Plans", "canViewSubscriptions", "canEditSubscriptions"],
+                                ["Upsell Rules", "canViewUpsellRules", "canEditUpsellRules"],
+                                ["Customers", "canViewCustomers", "canEditCustomers"],
+                              ] as const
+                            ).map(([label, viewField, editField]) => (
+                              <tr key={label} className="border-t border-border/60">
+                                <td className="py-1.5 pr-4 text-foreground">{label}</td>
+                                <td className="px-2 py-1.5">
+                                  <Switch name={viewField} defaultChecked={u[viewField]} />
+                                </td>
+                                <td className="px-2 py-1.5">
+                                  <Switch name={editField} defaultChecked={u[editField]} />
+                                </td>
+                              </tr>
+                            ))}
+                            <tr className="border-t border-border/60">
+                              <td className="py-1.5 pr-4 text-foreground">Reports</td>
+                              <td className="px-2 py-1.5">
+                                <Switch name="canViewReports" defaultChecked={u.canViewReports} />
+                              </td>
+                              <td className="px-2 py-1.5 text-muted-foreground">— (nothing to edit)</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
 

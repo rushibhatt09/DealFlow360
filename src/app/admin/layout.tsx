@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireInternalUser, getFeatureFlags } from "@/lib/guards";
+import { requireInternalUser, getFeatureFlags, ADMIN_SECTIONS } from "@/lib/guards";
 import { logoutAction } from "@/app/actions/auth";
 import { AppShell, type NavItem } from "@/components/app-shell";
 
@@ -8,38 +8,21 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const isAdmin = user.role === "ADMIN";
   const flags = await getFeatureFlags(user.userId);
 
+  const has = (section: keyof typeof ADMIN_SECTIONS) =>
+    isAdmin || flags[ADMIN_SECTIONS[section].view] || flags[ADMIN_SECTIONS[section].edit];
+
   const sections: (NavItem & { allowed: boolean })[] = [
-    { href: "/admin/products", label: "Products", icon: "package", allowed: isAdmin || flags.canManageProducts },
-    {
-      href: "/admin/discount-tiers",
-      label: "Discount & Approval",
-      icon: "percent",
-      allowed: isAdmin || flags.canManageDiscounts,
-    },
-    {
-      href: "/admin/warehouses",
-      label: "Warehouses & Stock",
-      icon: "warehouse",
-      allowed: isAdmin || flags.canManageWarehouses,
-    },
+    { href: "/admin/products", label: "Products", icon: "package", allowed: has("products") },
+    { href: "/admin/discount-tiers", label: "Discount & Approval", icon: "percent", allowed: has("discounts") },
+    { href: "/admin/warehouses", label: "Warehouses & Stock", icon: "warehouse", allowed: has("warehouses") },
     {
       href: "/admin/subscription-plans",
       label: "Subscription Plans",
       icon: "repeat",
-      allowed: isAdmin || flags.canManageSubscriptions,
+      allowed: has("subscriptions"),
     },
-    {
-      href: "/admin/upsell-rules",
-      label: "Upsell Rules",
-      icon: "sparkles",
-      allowed: isAdmin || flags.canManageUpsellRules,
-    },
-    {
-      href: "/admin/customers",
-      label: "Customers",
-      icon: "building",
-      allowed: isAdmin || flags.canManageCustomers,
-    },
+    { href: "/admin/upsell-rules", label: "Upsell Rules", icon: "sparkles", allowed: has("upsellRules") },
+    { href: "/admin/customers", label: "Customers", icon: "building", allowed: has("customers") },
     { href: "/admin/reports", label: "Reports", icon: "bar-chart", allowed: isAdmin || flags.canViewReports },
   ];
 
