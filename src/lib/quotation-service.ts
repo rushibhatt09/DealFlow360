@@ -2,9 +2,15 @@ import { db } from "@/lib/db";
 import {
   calculateBlendedRiskScore,
   resolveApprovalRequirement,
+  resolveVolumeBonus,
 } from "@/lib/discount-engine";
 import { splitWarehouseFulfillment } from "@/lib/warehouse-engine";
 import { generateUpcomingBillingEntries } from "@/lib/billing-engine";
+
+export async function computeVolumeBonus(lineValue: number) {
+  const rules = await db.volumeDiscountRule.findMany();
+  return resolveVolumeBonus(lineValue, rules);
+}
 
 export async function computeAndPersistRiskScore(quotationId: string) {
   const quotation = await db.quotation.findUniqueOrThrow({

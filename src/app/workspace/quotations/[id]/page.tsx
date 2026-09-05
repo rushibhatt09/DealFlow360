@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { AlertTriangle, Sparkles, MessageSquare } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireInternalUser } from "@/lib/guards";
-import { calculateBlendedRiskScore } from "@/lib/discount-engine";
+import { requireInternalUser, getFeatureFlags } from "@/lib/guards";
+import { calculateBlendedRiskScore, resolveVolumeBonus } from "@/lib/discount-engine";
 import { AddLineForm } from "./add-line-form";
 import {
   removeLineAction,
@@ -44,6 +44,7 @@ export default async function QuotationDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const user = await requireInternalUser();
+  const flags = await getFeatureFlags(user.userId);
   const { id } = await params;
 
   const quotation = await db.quotation.findUnique({
@@ -63,6 +64,7 @@ export default async function QuotationDetailPage({
 
   const products = await db.product.findMany({ orderBy: { name: "asc" } });
   const plans = await db.subscriptionPlan.findMany({ orderBy: { name: "asc" } });
+  const volumeRules = await db.volumeDiscountRule.findMany();
   const ceilings = await db.discountCeiling.findMany({ where: { tier: quotation.customer.tier } });
   const getCeiling = (tier: string, category: string) =>
     ceilings.find((c) => c.category === category)?.maxDiscountPct;
@@ -81,13 +83,14 @@ export default async function QuotationDetailPage({
     const netUnit = l.unitPrice * (1 - l.discountPct / 100);
     const lineTotal = netUnit * l.qty;
     const margin = (netUnit - l.product.unitCost) * l.qty;
-    return { ...l, lineTotal, margin };
+    const volumeBonus = resolveVolumeBonus(l.qty * l.unitPrice, volumeRules);
+    return { ...l, lineTotal, margin, volumeBonus };
   });
   const orderTotal = lineFinancials.reduce((s, l) => s + l.lineTotal, 0);
   const orderMargin = lineFinancials.reduce((s, l) => s + l.margin, 0);
 
   const upsellSuggestions =
-    quotation.status === "DRAFT" && quotation.lines.length > 0
+    flags.canSeeUpsellPanel && quotation.status === "DRAFT" && quotation.lines.length > 0
       ? await getUpsellSuggestionsForQuotation(id)
       : [];
 
@@ -162,6 +165,11 @@ export default async function QuotationDetailPage({
                     <TableCell>{l.qty}</TableCell>
                     <TableCell className={detail && detail.overagePts > 0 ? "font-medium text-danger" : ""}>
                       {l.discountPct}% {detail && detail.overagePts > 0 && `(+${detail.overagePts.toFixed(1)} over)`}
+                      {l.volumeBonus > 0 && (
+                        <Badge variant="success" className="ml-1.5">
+                          Vol +{l.volumeBonus}%
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>{formatCurrency(l.lineTotal)}</TableCell>
                     <TableCell className={l.margin < 0 ? "text-danger" : "text-success"}>
@@ -203,7 +211,7 @@ export default async function QuotationDetailPage({
 
           {quotation.status === "DRAFT" && (
             <div className="mt-4">
-              <AddLineForm quotationId={quotation.id} products={products} plans={plans} />
+              <AddLineForm quotationId={quotation.id} products={products} plans={plans} volumeRules={volumeRules} />
             </div>
           )}
         </CardContent>

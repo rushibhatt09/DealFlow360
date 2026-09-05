@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { requireInternalUser, requireRole } from "@/lib/guards";
 import {
   computeAndPersistRiskScore,
+  computeVolumeBonus,
   getApprovalRequirement,
   generateFulfillmentAndBilling,
   consolidateBackorder,
@@ -42,13 +43,17 @@ export async function addLineAction(formData: FormData) {
 
   const product = await db.product.findUniqueOrThrow({ where: { id: productId } });
 
+  const lineValue = qty * product.unitPrice;
+  const volumeBonus = await computeVolumeBonus(lineValue);
+  const finalDiscountPct = discountPct + volumeBonus;
+
   await db.quotationLine.create({
     data: {
       quotationId,
       productId,
       qty,
       unitPrice: product.unitPrice,
-      discountPct,
+      discountPct: finalDiscountPct,
       lineType,
       subscriptionPlanId,
     },
@@ -58,7 +63,15 @@ export async function addLineAction(formData: FormData) {
     data: { lastActivityAt: new Date() },
   });
   await computeAndPersistRiskScore(quotationId);
-  await logAudit("Quotation", quotationId, "LINE_ADDED", user.userId, product.name);
+  await logAudit(
+    "Quotation",
+    quotationId,
+    "LINE_ADDED",
+    user.userId,
+    volumeBonus > 0
+      ? `${product.name} (+${volumeBonus}% volume bonus, line value ₹${lineValue.toFixed(0)})`
+      : product.name,
+  );
 
   revalidatePath(`/workspace/quotations/${quotationId}`);
 }

@@ -1,6 +1,10 @@
 import { PrismaClient, type CustomerTier } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { calculateBlendedRiskScore, resolveApprovalRequirement } from "../src/lib/discount-engine";
+import {
+  calculateBlendedRiskScore,
+  resolveApprovalRequirement,
+  resolveVolumeBonus,
+} from "../src/lib/discount-engine";
 
 const db = new PrismaClient();
 
@@ -50,6 +54,7 @@ async function main() {
   await db.subscriptionPlan.deleteMany();
   await db.discountCeiling.deleteMany();
   await db.approvalRule.deleteMany();
+  await db.volumeDiscountRule.deleteMany();
   await db.warehouse.deleteMany();
   await db.product.deleteMany();
   await db.customer.deleteMany();
@@ -270,6 +275,11 @@ async function main() {
   await db.approvalRule.create({ data: { minScore: 5.01, maxScore: null, requiresManager: true, requiresFinance: true } });
   const approvalRules = await db.approvalRule.findMany();
 
+  await db.volumeDiscountRule.create({ data: { minLineValue: 5000, bonusDiscountPct: 5 } });
+  await db.volumeDiscountRule.create({ data: { minLineValue: 15000, bonusDiscountPct: 8 } });
+  await db.volumeDiscountRule.create({ data: { minLineValue: 40000, bonusDiscountPct: 12 } });
+  const volumeRules = await db.volumeDiscountRule.findMany();
+
   // ---------------------------------------------------------------------
   // Subscription plans & upsell rules
   // ---------------------------------------------------------------------
@@ -367,9 +377,12 @@ async function main() {
     const lineInputs = linePool.map((product) => {
       const ceiling = getCeiling(customer.tier, product.category) ?? getCeiling(customer.tier, "ALL") ?? 5;
       const overage = rng() < 0.18;
-      const discountPct = overage ? Math.min(45, ceiling + randInt(1, 15)) : randInt(0, Math.max(0, Math.floor(ceiling)));
+      const baseDiscountPct = overage
+        ? Math.min(45, ceiling + randInt(1, 15))
+        : randInt(0, Math.max(0, Math.floor(ceiling)));
       const qty = randInt(1, 8);
-      return { product, qty, discountPct };
+      const volumeBonus = resolveVolumeBonus(qty * product.unitPrice, volumeRules);
+      return { product, qty, discountPct: baseDiscountPct + volumeBonus };
     });
 
     const riskResult = calculateBlendedRiskScore(

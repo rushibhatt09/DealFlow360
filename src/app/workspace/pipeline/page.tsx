@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireInternalUser } from "@/lib/guards";
+import { requireFeature } from "@/lib/guards";
 import { submitForApprovalAction, confirmOrderAction } from "@/app/actions/quotations";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
@@ -26,7 +26,7 @@ export default async function PipelinePage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  const user = await requireInternalUser();
+  const user = await requireFeature("canViewPipeline");
   const { q } = await searchParams;
 
   const where: Prisma.QuotationWhereInput = user.role === "SALES_REP" ? { repId: user.userId } : {};

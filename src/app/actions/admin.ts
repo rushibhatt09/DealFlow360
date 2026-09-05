@@ -32,11 +32,23 @@ export async function updateInternalUserAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const role = String(formData.get("role")) as (typeof USER_ROLES)[number];
+  const canViewPipeline = formData.get("canViewPipeline") === "on";
+  const canViewDealHealth = formData.get("canViewDealHealth") === "on";
+  const canSeeUpsellPanel = formData.get("canSeeUpsellPanel") === "on";
 
   if (!name || !email || !USER_ROLES.includes(role)) return;
 
-  await db.user.update({ where: { id: userId }, data: { name, email, role } });
-  await logAudit("User", userId, "USER_UPDATED", admin.userId, `${name} -> ${role}`);
+  await db.user.update({
+    where: { id: userId },
+    data: { name, email, role, canViewPipeline, canViewDealHealth, canSeeUpsellPanel },
+  });
+  await logAudit(
+    "User",
+    userId,
+    "USER_UPDATED",
+    admin.userId,
+    `${name} -> ${role} (pipeline:${canViewPipeline} dealHealth:${canViewDealHealth} upsell:${canSeeUpsellPanel})`,
+  );
   revalidatePath("/admin/users");
 }
 
@@ -190,4 +202,15 @@ export async function createUpsellRuleAction(formData: FormData) {
     },
   });
   revalidatePath("/admin/upsell-rules");
+}
+
+export async function createVolumeDiscountRuleAction(formData: FormData) {
+  await requireRole(["ADMIN", "SALES_MANAGER"]);
+  const minLineValue = Number(formData.get("minLineValue"));
+  const bonusDiscountPct = Number(formData.get("bonusDiscountPct"));
+  if (!Number.isFinite(minLineValue) || !Number.isFinite(bonusDiscountPct)) return;
+
+  await db.volumeDiscountRule.create({ data: { minLineValue, bonusDiscountPct } });
+  revalidatePath("/admin/discount-tiers");
+  revalidatePath("/workspace/quotations", "layout");
 }

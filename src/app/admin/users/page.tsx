@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { formatDate } from "@/lib/utils";
 
 const ROLES = ["SALES_REP", "SALES_MANAGER", "FINANCE", "ADMIN"] as const;
@@ -89,31 +90,41 @@ export default async function UsersAdminPage() {
               </div>
 
               <div className="mt-4 grid grid-cols-1 gap-3 border-t border-border pt-4 md:grid-cols-2">
-                <form action={updateInternalUserAction} className="flex flex-wrap items-end gap-2">
+                <form action={updateInternalUserAction} className="space-y-3">
                   <input type="hidden" name="userId" value={u.id} />
-                  <div className="space-y-1">
-                    <Label className="text-xs">Name</Label>
-                    <Input name="name" defaultValue={u.name} className="h-8 w-32 text-xs" />
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Name</Label>
+                      <Input name="name" defaultValue={u.name} className="h-8 w-32 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Email</Label>
+                      <Input name="email" type="email" defaultValue={u.email} className="h-8 w-40 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Role</Label>
+                      <Select
+                        name="role"
+                        defaultValue={u.role}
+                        disabled={isSelf}
+                        title={isSelf ? "You can't change your own role" : undefined}
+                        className="h-8 w-36 text-xs"
+                      >
+                        {ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {r.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Email</Label>
-                    <Input name="email" type="email" defaultValue={u.email} className="h-8 w-40 text-xs" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Role</Label>
-                    <Select
-                      name="role"
-                      defaultValue={u.role}
-                      disabled={isSelf}
-                      title={isSelf ? "You can't change your own role" : undefined}
-                      className="h-8 w-36 text-xs"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {r.replaceAll("_", " ")}
-                        </option>
-                      ))}
-                    </Select>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-md bg-muted/50 px-3 py-2">
+                    <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Can see
+                    </span>
+                    <Switch name="canViewPipeline" defaultChecked={u.canViewPipeline} label="Pipeline" />
+                    <Switch name="canViewDealHealth" defaultChecked={u.canViewDealHealth} label="Deal Health" />
+                    <Switch name="canSeeUpsellPanel" defaultChecked={u.canSeeUpsellPanel} label="Upsell panel" />
                   </div>
                   <Button type="submit" size="sm" variant="outline">
                     Save

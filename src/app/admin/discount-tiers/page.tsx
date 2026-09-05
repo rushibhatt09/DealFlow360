@@ -1,5 +1,9 @@
 import { db } from "@/lib/db";
-import { createDiscountCeilingAction, createApprovalRuleAction } from "@/app/actions/admin";
+import {
+  createDiscountCeilingAction,
+  createApprovalRuleAction,
+  createVolumeDiscountRuleAction,
+} from "@/app/actions/admin";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -8,10 +12,12 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
+import { formatCurrency } from "@/lib/utils";
 
 export default async function DiscountTiersAdminPage() {
   const ceilings = await db.discountCeiling.findMany({ orderBy: [{ tier: "asc" }, { category: "asc" }] });
   const rules = await db.approvalRule.findMany({ orderBy: { minScore: "asc" } });
+  const volumeRules = await db.volumeDiscountRule.findMany({ orderBy: { minLineValue: "asc" } });
 
   return (
     <div className="space-y-6">
@@ -107,6 +113,52 @@ export default async function DiscountTiersAdminPage() {
                   <TableCell>{r.requiresFinance ? "Yes" : "No"}</TableCell>
                 </TableRow>
               ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Volume Discount Rules</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            A line whose value crosses the threshold automatically earns the bonus on top of
+            whatever discount the rep enters manually.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <form action={createVolumeDiscountRuleAction} className="mb-4 flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label>Min line value (₹)</Label>
+              <Input name="minLineValue" type="number" step="1" required className="w-32" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Bonus discount %</Label>
+              <Input name="bonusDiscountPct" type="number" step="0.1" required className="w-32" />
+            </div>
+            <Button type="submit">Add Volume Rule</Button>
+          </form>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Line value at or above</TableHead>
+                <TableHead>Bonus discount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {volumeRules.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="font-medium text-foreground">{formatCurrency(r.minLineValue)}</TableCell>
+                  <TableCell className="text-success">+{r.bonusDiscountPct}%</TableCell>
+                </TableRow>
+              ))}
+              {volumeRules.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={2} className="py-6 text-center text-muted-foreground">
+                    No volume rules configured yet.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

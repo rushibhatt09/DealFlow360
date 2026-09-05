@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, TrendingDown, Clock, Bell } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireInternalUser } from "@/lib/guards";
+import { requireFeature } from "@/lib/guards";
 import { nudgeQuotationAction } from "@/app/actions/quotations";
 import {
   findStalledDeals,
@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 
 export default async function DealHealthDashboard() {
-  const user = await requireInternalUser();
+  const user = await requireFeature("canViewDealHealth");
   const canNudge = user.role === "SALES_MANAGER" || user.role === "ADMIN";
 
   const openQuotations = await db.quotation.findMany({

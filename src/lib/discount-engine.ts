@@ -87,3 +87,22 @@ export function resolveApprovalRequirement(
     requiresFinance: match.requiresFinance,
   };
 }
+
+export interface VolumeDiscountRuleInput {
+  minLineValue: number;
+  bonusDiscountPct: number;
+}
+
+/**
+ * Bigger orders earn a bigger automatic discount on top of whatever the
+ * rep enters manually. Picks the richest tier the line's pre-discount
+ * value qualifies for, not just the first one it crosses.
+ */
+export function resolveVolumeBonus(
+  lineValue: number,
+  rules: VolumeDiscountRuleInput[],
+): number {
+  const qualifying = rules.filter((r) => lineValue >= r.minLineValue);
+  if (qualifying.length === 0) return 0;
+  return Math.max(...qualifying.map((r) => r.bonusDiscountPct));
+}
