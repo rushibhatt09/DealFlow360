@@ -7,9 +7,24 @@ import {
   type PortalSessionData,
 } from "./session";
 
+/**
+ * The session cookie is trusted for identity but not existence -- if the
+ * account behind it was deleted (or the dev database was reseeded with
+ * fresh IDs), the old cookie is now pointing at nothing. Rather than let
+ * every downstream query blow up with a Prisma "not found" error, catch
+ * it here once and send them back to login -- the same outcome as if
+ * they'd never been signed in. Note: Next.js only allows a cookie to be
+ * *written* from a Server Action or Route Handler, never mid-render, so
+ * this can't clear the stale cookie itself; logging in again overwrites
+ * it via the login Server Action, which is allowed to write it.
+ */
 export async function requireInternalUser(): Promise<InternalSessionData> {
   const session = await getInternalSession();
   if (!session.userId) redirect("/login");
+
+  const exists = await db.user.findUnique({ where: { id: session.userId }, select: { id: true } });
+  if (!exists) redirect("/login");
+
   return session as InternalSessionData;
 }
 
@@ -125,5 +140,9 @@ export async function requireRole(
 export async function requirePortalCustomer(): Promise<PortalSessionData> {
   const session = await getPortalSession();
   if (!session.customerId) redirect("/portal/login");
+
+  const exists = await db.customer.findUnique({ where: { id: session.customerId }, select: { id: true } });
+  if (!exists) redirect("/portal/login");
+
   return session as PortalSessionData;
 }
