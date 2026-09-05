@@ -1,0 +1,300 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  SALES_REP
+  SALES_MANAGER
+  FINANCE
+  ADMIN
+}
+
+enum CustomerTier {
+  BRONZE
+  SILVER
+  GOLD
+}
+
+enum QuotationStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  UNDER_NEGOTIATION
+  CONFIRMED
+  FULFILLED
+  CANCELLED
+}
+
+enum ApprovalLevel {
+  MANAGER
+  FINANCE
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RETURNED
+}
+
+enum LineType {
+  ONE_TIME
+  SUBSCRIPTION
+}
+
+enum FulfillmentStatus {
+  PLANNED
+  BACKORDER
+  SHIPPED
+}
+
+enum BillingStatus {
+  UPCOMING
+  INVOICED
+  PAID
+  CREDITED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+}
+
+enum SubscriptionInterval {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum NegotiationAuthor {
+  CUSTOMER
+  REP
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole
+  createdAt    DateTime @default(now())
+
+  quotations     Quotation[]      @relation("RepQuotations")
+  approvalSteps  ApprovalStep[]
+  auditLogs      AuditLog[]
+}
+
+model Customer {
+  id               String   @id @default(cuid())
+  name             String
+  tier             CustomerTier @default(BRONZE)
+  portalEmail      String   @unique
+  portalPasswordHash String
+  createdAt        DateTime @default(now())
+
+  quotations Quotation[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  category    String
+  unitPrice   Float
+  unitCost    Float
+  unit        String   @default("unit")
+  taxPct      Float    @default(0)
+  description String?
+
+  stockItems       StockItem[]
+  quotationLines   QuotationLine[]
+  upsellBase       UpsellRule[] @relation("BaseProduct")
+  upsellSuggested  UpsellRule[] @relation("SuggestedProduct")
+}
+
+model DiscountCeiling {
+  id          String       @id @default(cuid())
+  tier        CustomerTier
+  category    String
+  maxDiscountPct Float
+
+  @@unique([tier, category])
+}
+
+model ApprovalRule {
+  id              String   @id @default(cuid())
+  minScore        Float
+  maxScore        Float?
+  requiresManager Boolean  @default(true)
+  requiresFinance Boolean  @default(false)
+}
+
+model Warehouse {
+  id                 String   @id @default(cuid())
+  name               String
+  shippingCostWeight Float    @default(1)
+
+  stockItems StockItem[]
+  splits     FulfillmentSplit[]
+}
+
+model StockItem {
+  id          String   @id @default(cuid())
+  warehouseId String
+  productId   String
+  qty         Int
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@unique([warehouseId, productId])
+}
+
+model SubscriptionPlan {
+  id               String               @id @default(cuid())
+  name             String
+  interval         SubscriptionInterval
+  prorationEnabled Boolean              @default(true)
+
+  quotationLines QuotationLine[]
+}
+
+model Quotation {
+  id           String          @id @default(cuid())
+  customerId   String
+  repId        String
+  status       QuotationStatus @default(DRAFT)
+  riskScore    Float           @default(0)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  lastActivityAt DateTime      @default(now())
+
+  customer       Customer         @relation(fields: [customerId], references: [id])
+  rep            User             @relation("RepQuotations", fields: [repId], references: [id])
+  lines          QuotationLine[]
+  approvalSteps  ApprovalStep[]
+  splits         FulfillmentSplit[]
+  billingEntries BillingScheduleEntry[]
+  negotiations   NegotiationMessage[]
+  invoices       Invoice[]
+}
+
+model QuotationLine {
+  id                 String   @id @default(cuid())
+  quotationId        String
+  productId          String
+  qty                Int
+  unitPrice          Float
+  discountPct        Float    @default(0)
+  lineType           LineType @default(ONE_TIME)
+  subscriptionPlanId String?
+  addedViaUpsell     Boolean  @default(false)
+
+  quotation        Quotation         @relation(fields: [quotationId], references: [id])
+  product          Product           @relation(fields: [productId], references: [id])
+  subscriptionPlan SubscriptionPlan? @relation(fields: [subscriptionPlanId], references: [id])
+  splits           FulfillmentSplit[]
+  billingEntries   BillingScheduleEntry[]
+}
+
+model ApprovalStep {
+  id          String         @id @default(cuid())
+  quotationId String
+  level       ApprovalLevel
+  sequence    Int
+  status      ApprovalStatus @default(PENDING)
+  reviewerId  String?
+  reason      String?
+  decidedAt   DateTime?
+  createdAt   DateTime       @default(now())
+
+  quotation Quotation @relation(fields: [quotationId], references: [id])
+  reviewer  User?     @relation(fields: [reviewerId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  action     String
+  detail     String?
+  userId     String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model FulfillmentSplit {
+  id              String            @id @default(cuid())
+  quotationId     String
+  quotationLineId String
+  warehouseId     String
+  qty             Int
+  status          FulfillmentStatus @default(PLANNED)
+
+  quotation     Quotation     @relation(fields: [quotationId], references: [id])
+  quotationLine QuotationLine @relation(fields: [quotationLineId], references: [id])
+  warehouse     Warehouse     @relation(fields: [warehouseId], references: [id])
+}
+
+model BillingScheduleEntry {
+  id              String        @id @default(cuid())
+  quotationId     String
+  quotationLineId String
+  periodStart     DateTime
+  periodEnd       DateTime
+  amount          Float
+  status          BillingStatus @default(UPCOMING)
+
+  quotation     Quotation     @relation(fields: [quotationId], references: [id])
+  quotationLine QuotationLine @relation(fields: [quotationLineId], references: [id])
+}
+
+model NegotiationMessage {
+  id                 String            @id @default(cuid())
+  quotationId        String
+  author             NegotiationAuthor
+  message             String
+  counterDiscountPct Float?
+  createdAt          DateTime          @default(now())
+
+  quotation Quotation @relation(fields: [quotationId], references: [id])
+}
+
+model UpsellRule {
+  id                 String  @id @default(cuid())
+  baseProductId      String
+  suggestedProductId String
+  minMarginPct       Float   @default(0)
+  promoted           Boolean @default(false)
+
+  baseProduct      Product @relation("BaseProduct", fields: [baseProductId], references: [id])
+  suggestedProduct Product @relation("SuggestedProduct", fields: [suggestedProductId], references: [id])
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  quotationId String
+  amount      Float
+  status      InvoiceStatus @default(DRAFT)
+  issuedAt    DateTime      @default(now())
+
+  quotation Quotation @relation(fields: [quotationId], references: [id])
+  payments  Payment[]
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  invoiceId String
+  amount    Float
+  method    String
+  paidAt    DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+}
