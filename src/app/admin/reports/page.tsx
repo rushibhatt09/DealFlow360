@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Download, DollarSign, FileText, Percent, ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/lib/db";
+import { requireFeature } from "@/lib/guards";
 import type { Prisma, QuotationStatus } from "@prisma/client";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
@@ -30,6 +31,7 @@ export default async function ReportsPage({
     page?: string;
   }>;
 }) {
+  await requireFeature("canViewReports");
   const { q, repId, status, category, from, to, page: pageParam } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
   const reps = await db.user.findMany({ where: { role: "SALES_REP" } });

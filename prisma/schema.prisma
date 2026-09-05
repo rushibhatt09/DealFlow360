@@ -93,6 +93,18 @@ model User {
   canViewDealHealth  Boolean @default(true)
   canSeeUpsellPanel  Boolean @default(true)
 
+  // Admin backend section access. ADMIN role bypasses these entirely
+  // (always full access); every other role starts locked out of all of
+  // them and an Admin grants sections one at a time. Users & Permissions
+  // itself has no toggle -- it's hardcoded Admin-only, on purpose.
+  canManageProducts      Boolean @default(false)
+  canManageDiscounts     Boolean @default(false)
+  canManageWarehouses    Boolean @default(false)
+  canManageSubscriptions Boolean @default(false)
+  canManageUpsellRules   Boolean @default(false)
+  canManageCustomers     Boolean @default(false)
+  canViewReports         Boolean @default(false)
+
   quotations     Quotation[]      @relation("RepQuotations")
   approvalSteps  ApprovalStep[]
   auditLogs      AuditLog[]

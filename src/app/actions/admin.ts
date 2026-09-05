@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/guards";
+import { requireRole, requireFeature } from "@/lib/guards";
 import { hashPassword } from "@/lib/auth";
 import { logAudit } from "@/lib/quotation-service";
 
@@ -35,21 +35,37 @@ export async function updateInternalUserAction(formData: FormData) {
   const canViewPipeline = formData.get("canViewPipeline") === "on";
   const canViewDealHealth = formData.get("canViewDealHealth") === "on";
   const canSeeUpsellPanel = formData.get("canSeeUpsellPanel") === "on";
+  const canManageProducts = formData.get("canManageProducts") === "on";
+  const canManageDiscounts = formData.get("canManageDiscounts") === "on";
+  const canManageWarehouses = formData.get("canManageWarehouses") === "on";
+  const canManageSubscriptions = formData.get("canManageSubscriptions") === "on";
+  const canManageUpsellRules = formData.get("canManageUpsellRules") === "on";
+  const canManageCustomers = formData.get("canManageCustomers") === "on";
+  const canViewReports = formData.get("canViewReports") === "on";
 
   if (!name || !email || !USER_ROLES.includes(role)) return;
 
   await db.user.update({
     where: { id: userId },
-    data: { name, email, role, canViewPipeline, canViewDealHealth, canSeeUpsellPanel },
+    data: {
+      name,
+      email,
+      role,
+      canViewPipeline,
+      canViewDealHealth,
+      canSeeUpsellPanel,
+      canManageProducts,
+      canManageDiscounts,
+      canManageWarehouses,
+      canManageSubscriptions,
+      canManageUpsellRules,
+      canManageCustomers,
+      canViewReports,
+    },
   });
-  await logAudit(
-    "User",
-    userId,
-    "USER_UPDATED",
-    admin.userId,
-    `${name} -> ${role} (pipeline:${canViewPipeline} dealHealth:${canViewDealHealth} upsell:${canSeeUpsellPanel})`,
-  );
+  await logAudit("User", userId, "USER_UPDATED", admin.userId, `${name} -> ${role}`);
   revalidatePath("/admin/users");
+  revalidatePath("/admin", "layout");
 }
 
 export async function resetInternalUserPasswordAction(formData: FormData) {
@@ -67,7 +83,7 @@ export async function resetInternalUserPasswordAction(formData: FormData) {
 }
 
 export async function createCustomerAction(formData: FormData) {
-  const admin = await requireRole(["ADMIN", "SALES_MANAGER"]);
+  const admin = await requireFeature("canManageCustomers");
   const name = String(formData.get("name") ?? "").trim();
   const portalEmail = String(formData.get("portalEmail") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
@@ -83,7 +99,7 @@ export async function createCustomerAction(formData: FormData) {
 }
 
 export async function updateCustomerAction(formData: FormData) {
-  const admin = await requireRole(["ADMIN", "SALES_MANAGER"]);
+  const admin = await requireFeature("canManageCustomers");
   const customerId = String(formData.get("customerId"));
   const name = String(formData.get("name") ?? "").trim();
   const portalEmail = String(formData.get("portalEmail") ?? "").trim().toLowerCase();
@@ -97,7 +113,7 @@ export async function updateCustomerAction(formData: FormData) {
 }
 
 export async function resetCustomerPasswordAction(formData: FormData) {
-  const admin = await requireRole(["ADMIN", "SALES_MANAGER"]);
+  const admin = await requireFeature("canManageCustomers");
   const customerId = String(formData.get("customerId"));
   const newPassword = String(formData.get("newPassword") ?? "");
   if (newPassword.length < 6) return;
@@ -111,7 +127,7 @@ export async function resetCustomerPasswordAction(formData: FormData) {
 }
 
 export async function createProductAction(formData: FormData) {
-  await requireRole(["ADMIN", "SALES_MANAGER"]);
+  await requireFeature("canManageProducts");
   await db.product.create({
     data: {
       name: String(formData.get("name")),
@@ -126,7 +142,7 @@ export async function createProductAction(formData: FormData) {
 }
 
 export async function createWarehouseAction(formData: FormData) {
-  await requireRole(["ADMIN", "SALES_MANAGER"]);
+  await requireFeature("canManageWarehouses");
   await db.warehouse.create({
     data: {
       name: String(formData.get("name")),
@@ -137,7 +153,7 @@ export async function createWarehouseAction(formData: FormData) {
 }
 
 export async function setStockAction(formData: FormData) {
-  await requireRole(["ADMIN", "SALES_MANAGER"]);
+  await requireFeature("canManageWarehouses");
   const warehouseId = String(formData.get("warehouseId"));
   const productId = String(formData.get("productId"));
   const qty = Number(formData.get("qty"));
@@ -151,7 +167,7 @@ export async function setStockAction(formData: FormData) {
 }
 
 export async function createDiscountCeilingAction(formData: FormData) {
-  await requireRole(["ADMIN", "SALES_MANAGER"]);
+  await requireFeature("canManageDiscounts");
   const tier = String(formData.get("tier")) as "BRONZE" | "SILVER" | "GOLD";
   const category = String(formData.get("category"));
   const maxDiscountPct = Number(formData.get("maxDiscountPct"));
@@ -165,7 +181,7 @@ export async function createDiscountCeilingAction(formData: FormData) {
 }
 
 export async function createApprovalRuleAction(formData: FormData) {
-  await requireRole(["ADMIN", "SALES_MANAGER"]);
+  await requireFeature("canManageDiscounts");
   const minScore = Number(formData.get("minScore"));
   const maxScoreRaw = formData.get("maxScore");
   await db.approvalRule.create({
@@ -180,7 +196,7 @@ export async function createApprovalRuleAction(formData: FormData) {
 }
 
 export async function createSubscriptionPlanAction(formData: FormData) {
-  await requireRole(["ADMIN", "SALES_MANAGER"]);
+  await requireFeature("canManageSubscriptions");
   await db.subscriptionPlan.create({
     data: {
       name: String(formData.get("name")),
@@ -192,7 +208,7 @@ export async function createSubscriptionPlanAction(formData: FormData) {
 }
 
 export async function createUpsellRuleAction(formData: FormData) {
-  await requireRole(["ADMIN", "SALES_MANAGER"]);
+  await requireFeature("canManageUpsellRules");
   await db.upsellRule.create({
     data: {
       baseProductId: String(formData.get("baseProductId")),
@@ -205,7 +221,7 @@ export async function createUpsellRuleAction(formData: FormData) {
 }
 
 export async function createVolumeDiscountRuleAction(formData: FormData) {
-  await requireRole(["ADMIN", "SALES_MANAGER"]);
+  await requireFeature("canManageDiscounts");
   const minLineValue = Number(formData.get("minLineValue"));
   const bonusDiscountPct = Number(formData.get("bonusDiscountPct"));
   if (!Number.isFinite(minLineValue) || !Number.isFinite(bonusDiscountPct)) return;

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { db } from "@/lib/db";
+import { requireFeature } from "@/lib/guards";
 import {
   createCustomerAction,
   updateCustomerAction,
@@ -23,6 +24,7 @@ export default async function CustomersAdminPage({
 }: {
   searchParams: Promise<{ q?: string; tier?: string }>;
 }) {
+  await requireFeature("canManageCustomers");
   const { q, tier } = await searchParams;
   const where: Prisma.CustomerWhereInput = {};
   if (q) where.name = { contains: q };

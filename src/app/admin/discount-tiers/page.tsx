@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { requireFeature } from "@/lib/guards";
 import {
   createDiscountCeilingAction,
   createApprovalRuleAction,
@@ -15,6 +16,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/utils";
 
 export default async function DiscountTiersAdminPage() {
+  await requireFeature("canManageDiscounts");
   const ceilings = await db.discountCeiling.findMany({ orderBy: [{ tier: "asc" }, { category: "asc" }] });
   const rules = await db.approvalRule.findMany({ orderBy: { minScore: "asc" } });
   const volumeRules = await db.volumeDiscountRule.findMany({ orderBy: { minLineValue: "asc" } });

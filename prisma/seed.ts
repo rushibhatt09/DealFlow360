@@ -70,7 +70,16 @@ async function main() {
     data: { name: "Rushi Bhatt", email: "admin@dealflow360.com", passwordHash: pw, role: "ADMIN" },
   });
   const manager = await db.user.create({
-    data: { name: "Priya Shah", email: "manager@dealflow360.com", passwordHash: pw, role: "SALES_MANAGER" },
+    data: {
+      name: "Priya Shah",
+      email: "manager@dealflow360.com",
+      passwordHash: pw,
+      role: "SALES_MANAGER",
+      // Matches her documented job: "configures discount tiers and approval
+      // chains." Everything else in the admin backend she has to be
+      // granted explicitly, same as anyone else.
+      canManageDiscounts: true,
+    },
   });
   const finance = await db.user.create({
     data: { name: "Karan Mehta", email: "finance@dealflow360.com", passwordHash: pw, role: "FINANCE" },

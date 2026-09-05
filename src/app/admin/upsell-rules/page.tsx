@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { requireFeature } from "@/lib/guards";
 import { createUpsellRuleAction } from "@/app/actions/admin";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export default async function UpsellRulesAdminPage() {
+  await requireFeature("canManageUpsellRules");
   const rules = await db.upsellRule.findMany({ include: { baseProduct: true, suggestedProduct: true } });
   const products = await db.product.findMany({ orderBy: { name: "asc" } });
 

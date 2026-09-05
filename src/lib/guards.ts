@@ -13,27 +13,46 @@ export async function requireInternalUser(): Promise<InternalSessionData> {
   return session as InternalSessionData;
 }
 
-export type FeatureFlag = "canViewPipeline" | "canViewDealHealth" | "canSeeUpsellPanel";
+const FEATURE_SELECT = {
+  canViewPipeline: true,
+  canViewDealHealth: true,
+  canSeeUpsellPanel: true,
+  canManageProducts: true,
+  canManageDiscounts: true,
+  canManageWarehouses: true,
+  canManageSubscriptions: true,
+  canManageUpsellRules: true,
+  canManageCustomers: true,
+  canViewReports: true,
+} as const;
+
+export type FeatureFlag = keyof typeof FEATURE_SELECT;
 
 /**
  * Feature toggles live on the User row, not the session cookie, so a
  * change an Admin makes takes effect on the user's very next request --
- * not just their next login.
+ * not just their next login. ADMIN bypasses every flag: it's the one
+ * role that's always fully trusted, on purpose.
  */
-export async function requireFeature(feature: FeatureFlag): Promise<InternalSessionData> {
+export async function requireFeature(
+  feature: FeatureFlag,
+  fallback = "/workspace/quotations",
+): Promise<InternalSessionData> {
   const user = await requireInternalUser();
+  if (user.role === "ADMIN") return user;
+
   const record = await db.user.findUniqueOrThrow({
     where: { id: user.userId },
-    select: { canViewPipeline: true, canViewDealHealth: true, canSeeUpsellPanel: true },
+    select: FEATURE_SELECT,
   });
-  if (!record[feature]) redirect("/workspace/quotations");
+  if (!record[feature]) redirect(fallback);
   return user;
 }
 
 export async function getFeatureFlags(userId: string) {
   return db.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { canViewPipeline: true, canViewDealHealth: true, canSeeUpsellPanel: true },
+    select: FEATURE_SELECT,
   });
 }
 

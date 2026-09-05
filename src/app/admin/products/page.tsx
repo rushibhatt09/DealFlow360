@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { db } from "@/lib/db";
+import { requireFeature } from "@/lib/guards";
 import { createProductAction } from "@/app/actions/admin";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +21,7 @@ export default async function ProductsAdminPage({
 }: {
   searchParams: Promise<{ q?: string; category?: string }>;
 }) {
+  await requireFeature("canManageProducts");
   const { q, category } = await searchParams;
   const where: Prisma.ProductWhereInput = {};
   if (q) where.name = { contains: q };

@@ -25,7 +25,7 @@ export default async function UsersAdminPage() {
     <div className="space-y-6">
       <PageHeader
         title="Users &amp; Permissions"
-        description="Create internal accounts, change roles, and reset passwords. Admin-only — Sales Managers configure business rules, not who can log in."
+        description="Create internal accounts, change roles, and control exactly what each person can see. Admin-only — the Admin role always has full access; everyone else starts with none of the backend and is granted section by section below."
       />
 
       <Card>
@@ -120,12 +120,36 @@ export default async function UsersAdminPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-md bg-muted/50 px-3 py-2">
                     <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Can see
+                      Workspace
                     </span>
                     <Switch name="canViewPipeline" defaultChecked={u.canViewPipeline} label="Pipeline" />
                     <Switch name="canViewDealHealth" defaultChecked={u.canViewDealHealth} label="Deal Health" />
                     <Switch name="canSeeUpsellPanel" defaultChecked={u.canSeeUpsellPanel} label="Upsell panel" />
                   </div>
+
+                  {u.role === "ADMIN" ? (
+                    <p className="rounded-md bg-accent-soft px-3 py-2 text-xs text-muted-foreground">
+                      Admin role always has full backend access — nothing to toggle here.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-md bg-muted/50 px-3 py-2">
+                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Admin backend
+                      </span>
+                      <Switch name="canManageProducts" defaultChecked={u.canManageProducts} label="Products" />
+                      <Switch name="canManageDiscounts" defaultChecked={u.canManageDiscounts} label="Discount & Approval" />
+                      <Switch name="canManageWarehouses" defaultChecked={u.canManageWarehouses} label="Warehouses" />
+                      <Switch
+                        name="canManageSubscriptions"
+                        defaultChecked={u.canManageSubscriptions}
+                        label="Subscription Plans"
+                      />
+                      <Switch name="canManageUpsellRules" defaultChecked={u.canManageUpsellRules} label="Upsell Rules" />
+                      <Switch name="canManageCustomers" defaultChecked={u.canManageCustomers} label="Customers" />
+                      <Switch name="canViewReports" defaultChecked={u.canViewReports} label="Reports" />
+                    </div>
+                  )}
+
                   <Button type="submit" size="sm" variant="outline">
                     Save
                   </Button>

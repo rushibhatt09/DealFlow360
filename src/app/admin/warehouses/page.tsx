@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { requireFeature } from "@/lib/guards";
 import { createWarehouseAction, setStockAction } from "@/app/actions/admin";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 
 export default async function WarehousesAdminPage() {
+  await requireFeature("canManageWarehouses");
   const warehouses = await db.warehouse.findMany({ include: { stockItems: { include: { product: true } } } });
   const products = await db.product.findMany({ where: { category: "Hardware" }, orderBy: { name: "asc" } });
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/guards";
+import { requireFeature } from "@/lib/guards";
 import type { Prisma, QuotationStatus } from "@prisma/client";
 
 function csvEscape(value: string | number) {
@@ -12,7 +12,7 @@ function csvEscape(value: string | number) {
 }
 
 export async function GET(request: NextRequest) {
-  await requireRole(["ADMIN", "SALES_MANAGER"]);
+  await requireFeature("canViewReports");
 
   const { searchParams } = new URL(request.url);
   const repId = searchParams.get("repId") ?? undefined;
