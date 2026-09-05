@@ -1,14 +1,23 @@
 import Link from "next/link";
+import { AlertTriangle, TrendingDown, Clock, Bell } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireInternalUser } from "@/lib/guards";
+import { nudgeQuotationAction } from "@/app/actions/quotations";
 import {
   findStalledDeals,
   detectDiscountAnomaly,
   weightedAverageDiscount,
 } from "@/lib/deal-health-engine";
+import { PageHeader } from "@/components/page-header";
+import { StatCard } from "@/components/stat-card";
+import { StatusBadge } from "@/components/status-badge";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { formatDate } from "@/lib/utils";
 
 export default async function DealHealthDashboard() {
-  await requireInternalUser();
+  const user = await requireInternalUser();
+  const canNudge = user.role === "SALES_MANAGER" || user.role === "ADMIN";
 
   const openQuotations = await db.quotation.findMany({
     where: { status: { notIn: ["FULFILLED", "REJECTED", "CANCELLED"] } },
@@ -59,51 +68,98 @@ export default async function DealHealthDashboard() {
 
   const byId = new Map(openQuotations.map((q) => [q.id, q]));
 
+  const NudgeButton = ({ quotationId }: { quotationId: string }) =>
+    canNudge ? (
+      <form action={nudgeQuotationAction}>
+        <input type="hidden" name="quotationId" value={quotationId} />
+        <Button type="submit" size="sm" variant="outline">
+          <Bell className="h-3.5 w-3.5" />
+          Nudge
+        </Button>
+      </form>
+    ) : null;
+
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Deal Health &amp; Anomaly Dashboard</h1>
+      <PageHeader
+        title="Deal Health & Anomaly Dashboard"
+        description="Catch a deal losing momentum before it goes cold."
+      />
 
-      <section className="bg-white border rounded-lg p-5">
-        <h2 className="font-medium mb-3">Stalled Deals (inactive 5+ days)</h2>
-        <div className="space-y-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard label="Stalled Deals" value={stalledIds.size} icon={Clock} tone="warning" hint="Inactive 5+ days" />
+        <StatCard label="Discount Anomalies" value={anomalies.length} icon={AlertTriangle} tone="danger" hint="Above rep's own average" />
+        <StatCard label="Delivery Slippage" value={slippedIds.size} icon={TrendingDown} tone="warning" hint="Approved 3+ days, not confirmed" />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Stalled Deals</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
           {[...stalledIds].map((id) => {
             const q = byId.get(id)!;
             return (
-              <Link key={id} href={`/workspace/quotations/${id}`} className="block bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-sm hover:bg-amber-100">
-                {q.customer.name} · {q.rep.name} · {q.status.replace("_", " ")} · last activity {q.lastActivityAt.toDateString()}
-              </Link>
+              <div
+                key={id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-soft px-3 py-2.5 text-sm"
+              >
+                <Link href={`/workspace/quotations/${id}`} className="flex-1 hover:underline">
+                  <span className="font-medium text-foreground">{q.customer.name}</span> · {q.rep.name} ·{" "}
+                  <StatusBadge status={q.status} /> · last activity {formatDate(q.lastActivityAt)}
+                </Link>
+                <NudgeButton quotationId={id} />
+              </div>
             );
           })}
-          {stalledIds.size === 0 && <p className="text-sm text-slate-400">No stalled deals right now.</p>}
-        </div>
-      </section>
+          {stalledIds.size === 0 && <p className="text-sm text-muted-foreground">No stalled deals right now.</p>}
+        </CardContent>
+      </Card>
 
-      <section className="bg-white border rounded-lg p-5">
-        <h2 className="font-medium mb-3">Discount Anomaly Alerts</h2>
-        <div className="space-y-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>Discount Anomaly Alerts</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
           {anomalies.map((a) => (
-            <Link key={a.quotationId} href={`/workspace/quotations/${a.quotationId}`} className="block bg-red-50 border border-red-200 rounded-md px-3 py-2 text-sm hover:bg-red-100">
-              {a.repName} is discounting {a.deltaPts.toFixed(1)} pts above their historical average
-            </Link>
+            <div
+              key={a.quotationId}
+              className="flex items-center justify-between gap-3 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2.5 text-sm"
+            >
+              <Link href={`/workspace/quotations/${a.quotationId}`} className="flex-1 hover:underline">
+                <span className="font-medium text-foreground">{a.repName}</span> is discounting{" "}
+                <span className="font-medium">{a.deltaPts.toFixed(1)} pts</span> above their historical average
+              </Link>
+              <NudgeButton quotationId={a.quotationId} />
+            </div>
           ))}
-          {anomalies.length === 0 && <p className="text-sm text-slate-400">No anomalies detected.</p>}
-        </div>
-      </section>
+          {anomalies.length === 0 && <p className="text-sm text-muted-foreground">No anomalies detected.</p>}
+        </CardContent>
+      </Card>
 
-      <section className="bg-white border rounded-lg p-5">
-        <h2 className="font-medium mb-3">Delivery Promise Slippage</h2>
-        <div className="space-y-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>Delivery Promise Slippage</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
           {[...slippedIds].map((id) => {
             const q = byId.get(id)!;
             return (
-              <Link key={id} href={`/workspace/quotations/${id}`} className="block bg-orange-50 border border-orange-200 rounded-md px-3 py-2 text-sm hover:bg-orange-100">
-                {q.customer.name} approved but not confirmed/fulfilled for 3+ days
-              </Link>
+              <div
+                key={id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-soft px-3 py-2.5 text-sm"
+              >
+                <Link href={`/workspace/quotations/${id}`} className="flex-1 hover:underline">
+                  <span className="font-medium text-foreground">{q.customer.name}</span> approved but not
+                  confirmed/fulfilled for 3+ days
+                </Link>
+                <NudgeButton quotationId={id} />
+              </div>
             );
           })}
-          {slippedIds.size === 0 && <p className="text-sm text-slate-400">No slippage detected.</p>}
-        </div>
-      </section>
+          {slippedIds.size === 0 && <p className="text-sm text-muted-foreground">No slippage detected.</p>}
+        </CardContent>
+      </Card>
     </div>
   );
 }

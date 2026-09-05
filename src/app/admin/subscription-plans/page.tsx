@@ -1,38 +1,70 @@
 import { db } from "@/lib/db";
 import { createSubscriptionPlanAction } from "@/app/actions/admin";
+import { PageHeader } from "@/components/page-header";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default async function SubscriptionPlansAdminPage() {
   const plans = await db.subscriptionPlan.findMany();
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Subscription / Recurring Plan Setup</h1>
+      <PageHeader
+        title="Subscription / Recurring Plan Setup"
+        description="Recurring plans that can be attached to specific products."
+      />
 
-      <form action={createSubscriptionPlanAction} className="bg-white border rounded-lg p-4 flex flex-wrap items-end gap-2">
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Name</label>
-          <input name="name" required className="border rounded-md px-2 py-1.5 text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Interval</label>
-          <select name="interval" className="border rounded-md px-2 py-1.5 text-sm">
-            <option>MONTHLY</option><option>QUARTERLY</option><option>YEARLY</option>
-          </select>
-        </div>
-        <label className="flex items-center gap-1 text-sm"><input type="checkbox" name="prorationEnabled" defaultChecked /> Proration enabled</label>
-        <button className="bg-slate-900 text-white rounded-md px-3 py-1.5 text-sm">Add Plan</button>
-      </form>
+      <Card>
+        <CardContent className="pt-5">
+          <form action={createSubscriptionPlanAction} className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label>Name</Label>
+              <Input name="name" required className="w-48" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Interval</Label>
+              <Select name="interval" className="w-36">
+                <option>MONTHLY</option>
+                <option>QUARTERLY</option>
+                <option>YEARLY</option>
+              </Select>
+            </div>
+            <label className="flex items-center gap-1.5 pb-2 text-sm text-foreground">
+              <input type="checkbox" name="prorationEnabled" defaultChecked className="accent-primary" /> Proration
+              enabled
+            </label>
+            <Button type="submit">Add Plan</Button>
+          </form>
+        </CardContent>
+      </Card>
 
-      <table className="w-full text-sm bg-white border rounded-lg overflow-hidden">
-        <thead><tr className="text-left text-slate-500 border-b bg-slate-50"><th className="py-2 px-3">Name</th><th>Interval</th><th>Proration</th></tr></thead>
-        <tbody>
-          {plans.map((p) => (
-            <tr key={p.id} className="border-b last:border-0">
-              <td className="py-2 px-3">{p.name}</td><td>{p.interval}</td><td>{p.prorationEnabled ? "Yes" : "No"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Interval</TableHead>
+              <TableHead>Proration</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {plans.map((p) => (
+              <TableRow key={p.id}>
+                <TableCell className="font-medium text-foreground">{p.name}</TableCell>
+                <TableCell>
+                  <Badge variant="outline">{p.interval}</Badge>
+                </TableCell>
+                <TableCell>{p.prorationEnabled ? "Yes" : "No"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
     </div>
   );
 }

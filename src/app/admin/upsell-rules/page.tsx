@@ -1,5 +1,13 @@
 import { db } from "@/lib/db";
 import { createUpsellRuleAction } from "@/app/actions/admin";
+import { PageHeader } from "@/components/page-header";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default async function UpsellRulesAdminPage() {
   const rules = await db.upsellRule.findMany({ include: { baseProduct: true, suggestedProduct: true } });
@@ -7,42 +15,68 @@ export default async function UpsellRulesAdminPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Upsell / Cross-Sell Rule Setup</h1>
+      <PageHeader
+        title="Upsell / Cross-Sell Rule Setup"
+        description="Product pairings that surface as suggestions while a rep builds a quote."
+      />
 
-      <form action={createUpsellRuleAction} className="bg-white border rounded-lg p-4 flex flex-wrap items-end gap-2">
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">When cart has</label>
-          <select name="baseProductId" className="border rounded-md px-2 py-1.5 text-sm">
-            {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Suggest</label>
-          <select name="suggestedProductId" className="border rounded-md px-2 py-1.5 text-sm">
-            {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Min margin %</label>
-          <input name="minMarginPct" type="number" defaultValue={0} className="w-20 border rounded-md px-2 py-1.5 text-sm" />
-        </div>
-        <label className="flex items-center gap-1 text-sm"><input type="checkbox" name="promoted" /> Promoted</label>
-        <button className="bg-slate-900 text-white rounded-md px-3 py-1.5 text-sm">Add Rule</button>
-      </form>
+      <Card>
+        <CardContent className="pt-5">
+          <form action={createUpsellRuleAction} className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label>When cart has</Label>
+              <Select name="baseProductId" className="w-48">
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Suggest</Label>
+              <Select name="suggestedProductId" className="w-48">
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Min margin %</Label>
+              <Input name="minMarginPct" type="number" defaultValue={0} className="w-24" />
+            </div>
+            <label className="flex items-center gap-1.5 pb-2 text-sm text-foreground">
+              <input type="checkbox" name="promoted" className="accent-primary" /> Promoted
+            </label>
+            <Button type="submit">Add Rule</Button>
+          </form>
+        </CardContent>
+      </Card>
 
-      <table className="w-full text-sm bg-white border rounded-lg overflow-hidden">
-        <thead><tr className="text-left text-slate-500 border-b bg-slate-50"><th className="py-2 px-3">Base Product</th><th>Suggested</th><th>Min Margin</th><th>Promoted</th></tr></thead>
-        <tbody>
-          {rules.map((r) => (
-            <tr key={r.id} className="border-b last:border-0">
-              <td className="py-2 px-3">{r.baseProduct.name}</td>
-              <td>{r.suggestedProduct.name}</td>
-              <td>{r.minMarginPct}%</td>
-              <td>{r.promoted ? "Yes" : "No"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Base Product</TableHead>
+              <TableHead>Suggested</TableHead>
+              <TableHead>Min Margin</TableHead>
+              <TableHead>Promoted</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rules.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell className="font-medium text-foreground">{r.baseProduct.name}</TableCell>
+                <TableCell>{r.suggestedProduct.name}</TableCell>
+                <TableCell>{r.minMarginPct}%</TableCell>
+                <TableCell>{r.promoted ? <Badge variant="warning">Promoted</Badge> : "—"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
     </div>
   );
 }

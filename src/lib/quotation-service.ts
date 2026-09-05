@@ -142,6 +142,55 @@ export async function generateFulfillmentAndBilling(quotationId: string) {
   }
 }
 
+export async function consolidateBackorder(quotationId: string, splitId: string) {
+  const backorder = await db.fulfillmentSplit.findUniqueOrThrow({
+    where: { id: splitId },
+    include: { quotationLine: { include: { product: true } } },
+  });
+  if (backorder.status !== "BACKORDER") return { resolvedQty: 0, stillBackordered: 0 };
+
+  const warehouses = await db.warehouse.findMany({ include: { stockItems: true } });
+  const stockByWarehouse = warehouses.map((w) => {
+    const item = w.stockItems.find((s) => s.productId === backorder.quotationLine.productId);
+    return {
+      warehouseId: w.id,
+      warehouseName: w.name,
+      availableQty: item?.qty ?? 0,
+      shippingCostWeight: w.shippingCostWeight,
+    };
+  });
+
+  const split = splitWarehouseFulfillment(backorder.qty, stockByWarehouse);
+
+  for (const alloc of split.allocations) {
+    await db.fulfillmentSplit.create({
+      data: {
+        quotationId,
+        quotationLineId: backorder.quotationLineId,
+        warehouseId: alloc.warehouseId,
+        qty: alloc.qty,
+        status: "PLANNED",
+      },
+    });
+    await db.stockItem.updateMany({
+      where: { warehouseId: alloc.warehouseId, productId: backorder.quotationLine.productId },
+      data: { qty: { decrement: alloc.qty } },
+    });
+  }
+
+  if (split.backorderQty > 0) {
+    await db.fulfillmentSplit.update({
+      where: { id: splitId },
+      data: { qty: split.backorderQty },
+    });
+  } else {
+    await db.fulfillmentSplit.delete({ where: { id: splitId } });
+  }
+
+  const resolvedQty = backorder.qty - split.backorderQty;
+  return { resolvedQty, stillBackordered: split.backorderQty };
+}
+
 export async function calculateOneTimeTotal(quotationId: string) {
   const lines = await db.quotationLine.findMany({
     where: { quotationId, lineType: "ONE_TIME" },

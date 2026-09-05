@@ -1,34 +1,30 @@
-import Link from "next/link";
 import { requireRole } from "@/lib/guards";
+import { logoutAction } from "@/app/actions/auth";
+import { AppShell, type NavItem } from "@/components/app-shell";
+
+const navItems: NavItem[] = [
+  { href: "/admin/products", label: "Products", icon: "package" },
+  { href: "/admin/discount-tiers", label: "Discount & Approval", icon: "percent" },
+  { href: "/admin/warehouses", label: "Warehouses & Stock", icon: "warehouse" },
+  { href: "/admin/subscription-plans", label: "Subscription Plans", icon: "repeat" },
+  { href: "/admin/upsell-rules", label: "Upsell Rules", icon: "sparkles" },
+  { href: "/admin/reports", label: "Reports", icon: "bar-chart" },
+];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await requireRole(["ADMIN", "SALES_MANAGER"]);
-
-  const links = [
-    ["/admin/products", "Products"],
-    ["/admin/discount-tiers", "Discount Tiers & Approval"],
-    ["/admin/warehouses", "Warehouses & Stock"],
-    ["/admin/subscription-plans", "Subscription Plans"],
-    ["/admin/upsell-rules", "Upsell Rules"],
-    ["/admin/reports", "Reports"],
-  ];
+  const user = await requireRole(["ADMIN", "SALES_MANAGER"]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-slate-900 text-white">
-        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-6 flex-wrap">
-            <span className="font-semibold">DealFlow360 · Back-end</span>
-            <nav className="flex gap-4 text-sm text-slate-300 flex-wrap">
-              {links.map(([href, label]) => (
-                <Link key={href} href={href} className="hover:text-white">{label}</Link>
-              ))}
-            </nav>
-          </div>
-          <Link href="/workspace" className="text-sm underline hover:text-white">Back to Workspace</Link>
-        </div>
-      </header>
-      <main className="max-w-6xl mx-auto px-6 py-8">{children}</main>
-    </div>
+    <AppShell
+      brand="DealFlow360 · Admin"
+      brandHref="/admin"
+      navItems={navItems}
+      userName={user.name}
+      userRole={user.role}
+      logoutAction={logoutAction}
+      secondaryLink={{ href: "/workspace", label: "Back to Workspace", icon: "arrow-left" }}
+    >
+      {children}
+    </AppShell>
   );
 }

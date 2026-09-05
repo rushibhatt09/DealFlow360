@@ -1,5 +1,12 @@
 import { db } from "@/lib/db";
 import { createWarehouseAction, setStockAction } from "@/app/actions/admin";
+import { PageHeader } from "@/components/page-header";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 export default async function WarehousesAdminPage() {
   const warehouses = await db.warehouse.findMany({ include: { stockItems: { include: { product: true } } } });
@@ -7,43 +14,68 @@ export default async function WarehousesAdminPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Warehouses &amp; Fulfillment Setup</h1>
+      <PageHeader
+        title="Warehouses & Fulfillment Setup"
+        description="Stock levels and shipping-cost weighting used by the auto-split logic."
+      />
 
-      <form action={createWarehouseAction} className="bg-white border rounded-lg p-4 flex flex-wrap items-end gap-2">
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Name</label>
-          <input name="name" required className="border rounded-md px-2 py-1.5 text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Shipping Cost Weight</label>
-          <input name="shippingCostWeight" type="number" step="0.1" defaultValue={1} className="w-28 border rounded-md px-2 py-1.5 text-sm" />
-        </div>
-        <button className="bg-slate-900 text-white rounded-md px-3 py-1.5 text-sm">Add Warehouse</button>
-      </form>
+      <Card>
+        <CardContent className="pt-5">
+          <form action={createWarehouseAction} className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label>Name</Label>
+              <Input name="name" required className="w-48" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Shipping Cost Weight</Label>
+              <Input name="shippingCostWeight" type="number" step="0.1" defaultValue={1} className="w-28" />
+            </div>
+            <Button type="submit">Add Warehouse</Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {warehouses.map((w) => (
-        <div key={w.id} className="bg-white border rounded-lg p-4">
-          <h2 className="font-medium mb-2">{w.name} <span className="text-xs text-slate-400">(shipping weight {w.shippingCostWeight})</span></h2>
-          <table className="w-full text-sm mb-3">
-            <thead><tr className="text-left text-slate-500 border-b"><th className="py-1">Product</th><th>Qty on hand</th></tr></thead>
-            <tbody>
-              {w.stockItems.map((s) => (
-                <tr key={s.id} className="border-b last:border-0">
-                  <td className="py-1">{s.product.name}</td>
-                  <td>{s.qty}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <form action={setStockAction} className="flex items-end gap-2">
-            <input type="hidden" name="warehouseId" value={w.id} />
-            <select name="productId" className="border rounded-md px-2 py-1 text-xs">
-              {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <input name="qty" type="number" min={0} defaultValue={0} className="w-20 border rounded-md px-2 py-1 text-xs" />
-            <button className="text-xs bg-slate-900 text-white rounded px-2 py-1">Set Stock</button>
-          </form>
-        </div>
+        <Card key={w.id}>
+          <CardHeader>
+            <CardTitle>
+              {w.name}{" "}
+              <span className="font-normal text-muted-foreground">(shipping weight {w.shippingCostWeight})</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table className="mb-4">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Qty on hand</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {w.stockItems.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium text-foreground">{s.product.name}</TableCell>
+                    <TableCell>{s.qty}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <form action={setStockAction} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="warehouseId" value={w.id} />
+              <Select name="productId" className="w-48">
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+              <Input name="qty" type="number" min={0} defaultValue={0} className="w-24" />
+              <Button type="submit" size="sm" variant="outline">
+                Set Stock
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       ))}
     </div>
   );

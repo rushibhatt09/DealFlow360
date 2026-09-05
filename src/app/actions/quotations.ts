@@ -8,6 +8,7 @@ import {
   computeAndPersistRiskScore,
   getApprovalRequirement,
   generateFulfillmentAndBilling,
+  consolidateBackorder,
   calculateOneTimeTotal,
   logAudit,
 } from "@/lib/quotation-service";
@@ -194,6 +195,22 @@ export async function decideApprovalAction(formData: FormData) {
   revalidatePath(`/workspace/quotations/${quotationId}`);
 }
 
+export async function nudgeQuotationAction(formData: FormData) {
+  const user = await requireRole(["SALES_MANAGER", "ADMIN"]);
+  const quotationId = String(formData.get("quotationId"));
+
+  await logAudit(
+    "Quotation",
+    quotationId,
+    "NUDGE_SENT",
+    user.userId,
+    "Manager nudge: this deal needs attention",
+  );
+
+  revalidatePath("/workspace/dashboard");
+  revalidatePath(`/workspace/quotations/${quotationId}`);
+}
+
 export async function getUpsellSuggestionsForQuotation(quotationId: string) {
   const lines = await db.quotationLine.findMany({
     where: { quotationId },
@@ -232,6 +249,23 @@ export async function overrideFulfillmentAction(formData: FormData) {
 
   await db.fulfillmentSplit.update({ where: { id: splitId }, data: { qty: newQty } });
   await logAudit("FulfillmentSplit", splitId, "MANUAL_OVERRIDE", user.userId, `qty=${newQty}`);
+
+  revalidatePath(`/workspace/quotations/${quotationId}`);
+}
+
+export async function consolidateBackorderAction(formData: FormData) {
+  const user = await requireInternalUser();
+  const splitId = String(formData.get("splitId"));
+  const quotationId = String(formData.get("quotationId"));
+
+  const result = await consolidateBackorder(quotationId, splitId);
+  await logAudit(
+    "FulfillmentSplit",
+    splitId,
+    "BACKORDER_CONSOLIDATED",
+    user.userId,
+    `resolved ${result.resolvedQty}, still backordered ${result.stillBackordered}`,
+  );
 
   revalidatePath(`/workspace/quotations/${quotationId}`);
 }

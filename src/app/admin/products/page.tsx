@@ -1,64 +1,88 @@
 import { db } from "@/lib/db";
 import { createProductAction } from "@/app/actions/admin";
+import { PageHeader } from "@/components/page-header";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/utils";
 
 export default async function ProductsAdminPage() {
   const products = await db.product.findMany({ orderBy: { category: "asc" } });
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Products &amp; Price List</h1>
+      <PageHeader title="Products & Price List" description="General product catalog used across quotations." />
 
-      <form action={createProductAction} className="bg-white border rounded-lg p-4 flex flex-wrap items-end gap-2">
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Name</label>
-          <input name="name" required className="border rounded-md px-2 py-1.5 text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Category</label>
-          <select name="category" className="border rounded-md px-2 py-1.5 text-sm">
-            <option>Hardware</option>
-            <option>Services</option>
-            <option>Subscriptions</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Price</label>
-          <input name="unitPrice" type="number" step="0.01" required className="w-24 border rounded-md px-2 py-1.5 text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Cost</label>
-          <input name="unitCost" type="number" step="0.01" required className="w-24 border rounded-md px-2 py-1.5 text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Unit</label>
-          <input name="unit" defaultValue="unit" className="w-20 border rounded-md px-2 py-1.5 text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Tax %</label>
-          <input name="taxPct" type="number" step="0.01" defaultValue={0} className="w-20 border rounded-md px-2 py-1.5 text-sm" />
-        </div>
-        <button className="bg-slate-900 text-white rounded-md px-3 py-1.5 text-sm">Add Product</button>
-      </form>
+      <Card>
+        <CardContent className="pt-5">
+          <form action={createProductAction} className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label>Name</Label>
+              <Input name="name" required className="w-44" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select name="category" className="w-36">
+                <option>Hardware</option>
+                <option>Services</option>
+                <option>Subscriptions</option>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Price</Label>
+              <Input name="unitPrice" type="number" step="0.01" required className="w-24" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Cost</Label>
+              <Input name="unitCost" type="number" step="0.01" required className="w-24" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Unit</Label>
+              <Input name="unit" defaultValue="unit" className="w-20" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tax %</Label>
+              <Input name="taxPct" type="number" step="0.01" defaultValue={0} className="w-20" />
+            </div>
+            <Button type="submit">Add Product</Button>
+          </form>
+        </CardContent>
+      </Card>
 
-      <table className="w-full text-sm bg-white border rounded-lg overflow-hidden">
-        <thead>
-          <tr className="text-left text-slate-500 border-b bg-slate-50">
-            <th className="py-2 px-3">Name</th><th>Category</th><th>Price</th><th>Cost</th><th>Margin</th><th>Tax</th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.map((p) => (
-            <tr key={p.id} className="border-b last:border-0">
-              <td className="py-2 px-3">{p.name}</td>
-              <td>{p.category}</td>
-              <td>${p.unitPrice.toFixed(2)}</td>
-              <td>${p.unitCost.toFixed(2)}</td>
-              <td>{(((p.unitPrice - p.unitCost) / p.unitPrice) * 100).toFixed(0)}%</td>
-              <td>{p.taxPct}%</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead>Cost</TableHead>
+              <TableHead>Margin</TableHead>
+              <TableHead>Tax</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {products.map((p) => (
+              <TableRow key={p.id}>
+                <TableCell className="font-medium text-foreground">{p.name}</TableCell>
+                <TableCell>
+                  <Badge variant="outline">{p.category}</Badge>
+                </TableCell>
+                <TableCell>{formatCurrency(p.unitPrice)}</TableCell>
+                <TableCell>{formatCurrency(p.unitCost)}</TableCell>
+                <TableCell className="text-success">
+                  {(((p.unitPrice - p.unitCost) / p.unitPrice) * 100).toFixed(0)}%
+                </TableCell>
+                <TableCell>{p.taxPct}%</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
     </div>
   );
 }

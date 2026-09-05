@@ -27,7 +27,7 @@ async function main() {
   const portalPw = await bcrypt.hash("portal123", 10);
 
   const admin = await db.user.create({
-    data: { name: "Admin User", email: "admin@dealflow360.com", passwordHash: pw, role: "ADMIN" },
+    data: { name: "Rushi Bhatt", email: "admin@dealflow360.com", passwordHash: pw, role: "ADMIN" },
   });
   const manager = await db.user.create({
     data: { name: "Priya Shah", email: "manager@dealflow360.com", passwordHash: pw, role: "SALES_MANAGER" },

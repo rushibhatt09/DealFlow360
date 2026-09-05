@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import { addLineAction } from "@/app/actions/quotations";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { formatCurrency } from "@/lib/utils";
 
 interface Product {
   id: string;
@@ -29,50 +34,53 @@ export function AddLineForm({
   const isSubscription = product?.category === "Subscriptions";
 
   return (
-    <form action={addLineAction} className="flex flex-wrap items-end gap-2 bg-slate-50 border rounded-lg p-3">
+    <form
+      action={addLineAction}
+      className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-border bg-muted/50 p-4"
+    >
       <input type="hidden" name="quotationId" value={quotationId} />
       <input type="hidden" name="lineType" value={isSubscription ? "SUBSCRIPTION" : "ONE_TIME"} />
 
-      <div>
-        <label className="block text-xs text-slate-500 mb-1">Product</label>
-        <select
+      <div className="space-y-1.5">
+        <Label>Product</Label>
+        <Select
           name="productId"
           value={productId}
           onChange={(e) => setProductId(e.target.value)}
-          className="border rounded-md px-2 py-1.5 text-sm"
+          className="w-56"
         >
           {products.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.name} (${p.unitPrice}) — {p.category}
+              {p.name} ({formatCurrency(p.unitPrice)}) — {p.category}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {isSubscription && (
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Plan</label>
-          <select name="subscriptionPlanId" required className="border rounded-md px-2 py-1.5 text-sm">
+        <div className="space-y-1.5">
+          <Label>Plan</Label>
+          <Select name="subscriptionPlanId" required className="w-44">
             {plans.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
             ))}
-          </select>
+          </Select>
         </div>
       )}
 
-      <div>
-        <label className="block text-xs text-slate-500 mb-1">Qty</label>
-        <input name="qty" type="number" min={1} defaultValue={1} className="w-20 border rounded-md px-2 py-1.5 text-sm" />
+      <div className="space-y-1.5">
+        <Label>Qty</Label>
+        <Input name="qty" type="number" min={1} defaultValue={1} className="w-20" />
       </div>
 
-      <div>
-        <label className="block text-xs text-slate-500 mb-1">Discount %</label>
-        <input name="discountPct" type="number" min={0} max={100} defaultValue={0} className="w-24 border rounded-md px-2 py-1.5 text-sm" />
+      <div className="space-y-1.5">
+        <Label>Discount %</Label>
+        <Input name="discountPct" type="number" min={0} max={100} defaultValue={0} className="w-24" />
       </div>
 
-      <button type="submit" className="bg-slate-900 text-white rounded-md px-3 py-1.5 text-sm hover:bg-slate-800">
-        Add to Quote
-      </button>
+      <Button type="submit">Add to Quote</Button>
     </form>
   );
 }
