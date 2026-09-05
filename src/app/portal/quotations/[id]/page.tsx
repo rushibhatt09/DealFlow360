@@ -30,6 +30,7 @@ export default async function PortalQuotationPage({
     include: {
       lines: { include: { product: true } },
       negotiations: { orderBy: { createdAt: "asc" } },
+      rep: true,
     },
   });
 
@@ -124,7 +125,9 @@ export default async function PortalQuotationPage({
                     n.author === "CUSTOMER" ? "bg-primary-soft" : "bg-muted",
                   )}
                 >
-                  <span className="block text-xs text-muted-foreground">{n.author}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {n.author === "CUSTOMER" ? "You" : quotation.rep.name}
+                  </span>
                   <span className="text-foreground">{n.message}</span>
                 </div>
               ))}

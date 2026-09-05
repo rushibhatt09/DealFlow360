@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { AlertTriangle, Sparkles } from "lucide-react";
+import { AlertTriangle, Sparkles, MessageSquare } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireInternalUser } from "@/lib/guards";
 import { calculateBlendedRiskScore } from "@/lib/discount-engine";
@@ -13,9 +13,11 @@ import {
   overrideFulfillmentAction,
   consolidateBackorderAction,
   changeSubscriptionQtyAction,
+  cancelSubscriptionAction,
   confirmOrderAction,
   recordPaymentAction,
 } from "@/app/actions/quotations";
+import { submitRepReplyAction } from "@/app/actions/negotiation";
 import { BackLink } from "@/components/app-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -32,7 +34,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateTime, cn } from "@/lib/utils";
 
 const ROLE_FOR_LEVEL = { MANAGER: "SALES_MANAGER", FINANCE: "FINANCE" } as const;
 
@@ -54,6 +56,7 @@ export default async function QuotationDetailPage({
       splits: { include: { warehouse: true, quotationLine: { include: { product: true } } } },
       billingEntries: { include: { quotationLine: { include: { product: true } } }, orderBy: { periodStart: "asc" } },
       invoices: { include: { payments: true } },
+      negotiations: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!quotation) notFound();
@@ -377,35 +380,52 @@ export default async function QuotationDetailPage({
           <CardContent className="space-y-4">
             {quotation.lines
               .filter((l) => l.lineType === "SUBSCRIPTION")
-              .map((l) => (
-                <div key={l.id} className="rounded-lg border border-border p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-foreground">
-                      {l.product.name} · {l.subscriptionPlan?.name}
-                    </span>
-                    {(quotation.status === "APPROVED" || quotation.status === "CONFIRMED") && (
-                      <form action={changeSubscriptionQtyAction} className="flex items-center gap-1.5">
-                        <input type="hidden" name="lineId" value={l.id} />
-                        <input type="hidden" name="quotationId" value={quotation.id} />
-                        <Input name="qty" type="number" min={1} defaultValue={l.qty} className="h-8 w-16 text-xs" />
-                        <Button type="submit" size="sm" variant="outline">
-                          Change Qty (prorate)
-                        </Button>
-                      </form>
-                    )}
-                  </div>
-                  <Table className="mt-2">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Period</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {quotation.billingEntries
-                        .filter((b) => b.quotationLineId === l.id)
-                        .map((b) => (
+              .map((l) => {
+                const lineEntries = quotation.billingEntries.filter((b) => b.quotationLineId === l.id);
+                const isCancelled = lineEntries.length > 0 && !lineEntries.some((b) => b.status === "UPCOMING");
+                const canManage =
+                  !isCancelled && (quotation.status === "APPROVED" || quotation.status === "CONFIRMED");
+                return (
+                  <div key={l.id} className="rounded-lg border border-border p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-foreground">
+                        {l.product.name} · {l.subscriptionPlan?.name}
+                        {isCancelled && (
+                          <Badge variant="danger" className="ml-2">
+                            Cancelled
+                          </Badge>
+                        )}
+                      </span>
+                      {canManage && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <form action={changeSubscriptionQtyAction} className="flex items-center gap-1.5">
+                            <input type="hidden" name="lineId" value={l.id} />
+                            <input type="hidden" name="quotationId" value={quotation.id} />
+                            <Input name="qty" type="number" min={1} defaultValue={l.qty} className="h-8 w-16 text-xs" />
+                            <Button type="submit" size="sm" variant="outline">
+                              Change Qty (prorate)
+                            </Button>
+                          </form>
+                          <form action={cancelSubscriptionAction}>
+                            <input type="hidden" name="lineId" value={l.id} />
+                            <input type="hidden" name="quotationId" value={quotation.id} />
+                            <Button type="submit" size="sm" variant="destructive">
+                              Cancel Subscription
+                            </Button>
+                          </form>
+                        </div>
+                      )}
+                    </div>
+                    <Table className="mt-2">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Period</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {lineEntries.map((b) => (
                           <TableRow key={b.id}>
                             <TableCell>
                               {formatDate(b.periodStart)} → {formatDate(b.periodEnd)}
@@ -416,10 +436,52 @@ export default async function QuotationDetailPage({
                             </TableCell>
                           </TableRow>
                         ))}
-                    </TableBody>
-                  </Table>
+                      </TableBody>
+                    </Table>
+                  </div>
+                );
+              })}
+          </CardContent>
+        </Card>
+      )}
+
+      {(quotation.negotiations.length > 0 ||
+        quotation.status === "APPROVED" ||
+        quotation.status === "UNDER_NEGOTIATION") && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-primary" />
+              Customer Negotiation Thread
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 max-h-64 space-y-2 overflow-y-auto">
+              {quotation.negotiations.map((n) => (
+                <div
+                  key={n.id}
+                  className={cn(
+                    "rounded-lg px-3 py-2 text-sm",
+                    n.author === "CUSTOMER" ? "bg-info-soft" : "bg-primary-soft",
+                  )}
+                >
+                  <span className="block text-xs text-muted-foreground">
+                    {n.author === "CUSTOMER" ? quotation.customer.name : "You"}
+                  </span>
+                  <span className="text-foreground">{n.message}</span>
                 </div>
               ))}
+              {quotation.negotiations.length === 0 && (
+                <p className="text-sm text-muted-foreground">No messages yet.</p>
+              )}
+            </div>
+            {(quotation.status === "APPROVED" || quotation.status === "UNDER_NEGOTIATION") && (
+              <form action={submitRepReplyAction} className="flex items-center gap-2">
+                <input type="hidden" name="quotationId" value={quotation.id} />
+                <Input name="message" placeholder="Reply to the customer..." className="flex-1" />
+                <Button type="submit">Send Reply</Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       )}

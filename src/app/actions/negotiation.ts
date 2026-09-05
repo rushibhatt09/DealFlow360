@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requirePortalCustomer } from "@/lib/guards";
+import { requirePortalCustomer, requireInternalUser } from "@/lib/guards";
 import {
   computeAndPersistRiskScore,
   getApprovalRequirement,
@@ -58,6 +58,25 @@ export async function submitCounterDiscountAction(formData: FormData) {
   });
   await logAudit("Quotation", quotationId, "COUNTER_DISCOUNT", null, `${counterDiscountPct}%`);
 
+  revalidatePath(`/portal/quotations/${quotationId}`);
+}
+
+export async function submitRepReplyAction(formData: FormData) {
+  const user = await requireInternalUser();
+  const quotationId = String(formData.get("quotationId"));
+  const message = String(formData.get("message") ?? "").trim();
+  if (!message) return;
+
+  await db.negotiationMessage.create({
+    data: { quotationId, author: "REP", message },
+  });
+  await db.quotation.update({
+    where: { id: quotationId },
+    data: { lastActivityAt: new Date() },
+  });
+  await logAudit("Quotation", quotationId, "REP_REPLY", user.userId, message);
+
+  revalidatePath(`/workspace/quotations/${quotationId}`);
   revalidatePath(`/portal/quotations/${quotationId}`);
 }
 

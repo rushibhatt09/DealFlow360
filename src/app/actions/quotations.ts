@@ -248,7 +248,7 @@ export async function overrideFulfillmentAction(formData: FormData) {
   const newQty = Number(formData.get("qty"));
 
   await db.fulfillmentSplit.update({ where: { id: splitId }, data: { qty: newQty } });
-  await logAudit("FulfillmentSplit", splitId, "MANUAL_OVERRIDE", user.userId, `qty=${newQty}`);
+  await logAudit("Quotation", quotationId, "MANUAL_OVERRIDE", user.userId, `qty=${newQty}`);
 
   revalidatePath(`/workspace/quotations/${quotationId}`);
 }
@@ -260,8 +260,8 @@ export async function consolidateBackorderAction(formData: FormData) {
 
   const result = await consolidateBackorder(quotationId, splitId);
   await logAudit(
-    "FulfillmentSplit",
-    splitId,
+    "Quotation",
+    quotationId,
     "BACKORDER_CONSOLIDATED",
     user.userId,
     `resolved ${result.resolvedQty}, still backordered ${result.stillBackordered}`,
@@ -306,11 +306,63 @@ export async function changeSubscriptionQtyAction(formData: FormData) {
 
   await db.quotationLine.update({ where: { id: lineId }, data: { qty: newQty } });
   await logAudit(
-    "QuotationLine",
-    lineId,
+    "Quotation",
+    quotationId,
     "SUBSCRIPTION_QTY_CHANGED",
     user.userId,
     `qty -> ${newQty}`,
+  );
+
+  revalidatePath(`/workspace/quotations/${quotationId}`);
+}
+
+export async function cancelSubscriptionAction(formData: FormData) {
+  const user = await requireInternalUser();
+  const lineId = String(formData.get("lineId"));
+  const quotationId = String(formData.get("quotationId"));
+
+  const line = await db.quotationLine.findUniqueOrThrow({ where: { id: lineId } });
+  const nextEntry = await db.billingScheduleEntry.findFirst({
+    where: { quotationLineId: lineId, status: "UPCOMING" },
+    orderBy: { periodStart: "asc" },
+  });
+
+  let creditAmount = 0;
+  if (nextEntry) {
+    const proration = prorateQuantityChange({
+      periodStart: nextEntry.periodStart,
+      periodEnd: nextEntry.periodEnd,
+      changeDate: new Date(),
+      oldQty: line.qty,
+      newQty: 0,
+      unitPrice: line.unitPrice * (1 - line.discountPct / 100),
+    });
+    creditAmount = -proration.netAmount;
+
+    if (creditAmount > 0) {
+      await db.billingScheduleEntry.create({
+        data: {
+          quotationId,
+          quotationLineId: lineId,
+          periodStart: new Date(),
+          periodEnd: nextEntry.periodEnd,
+          amount: -creditAmount,
+          status: "CREDITED",
+        },
+      });
+    }
+  }
+
+  await db.billingScheduleEntry.deleteMany({
+    where: { quotationLineId: lineId, status: "UPCOMING" },
+  });
+
+  await logAudit(
+    "Quotation",
+    quotationId,
+    "SUBSCRIPTION_CANCELLED",
+    user.userId,
+    creditAmount > 0 ? `credit note ${creditAmount.toFixed(2)}` : "no credit due",
   );
 
   revalidatePath(`/workspace/quotations/${quotationId}`);
@@ -347,7 +399,7 @@ export async function recordPaymentAction(formData: FormData) {
     where: { id: quotationId },
     data: { status: "FULFILLED", lastActivityAt: new Date() },
   });
-  await logAudit("Invoice", invoice.id, "PAID", user.userId, method);
+  await logAudit("Quotation", quotationId, "PAID", user.userId, method);
 
   revalidatePath(`/workspace/quotations/${quotationId}`);
 }
