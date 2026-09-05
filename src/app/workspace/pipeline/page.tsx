@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireInternalUser } from "@/lib/guards";
 import { submitForApprovalAction, confirmOrderAction } from "@/app/actions/quotations";
@@ -6,8 +7,9 @@ import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
-import type { QuotationStatus } from "@prisma/client";
+import type { Prisma, QuotationStatus } from "@prisma/client";
 
 const COLUMNS: { status: QuotationStatus; label: string }[] = [
   { status: "DRAFT", label: "Draft" },
@@ -17,22 +19,31 @@ const COLUMNS: { status: QuotationStatus; label: string }[] = [
   { status: "CONFIRMED", label: "Confirmed" },
   { status: "FULFILLED", label: "Fulfilled" },
 ];
+const COLUMN_CARD_LIMIT = 12;
 
-export default async function PipelinePage() {
+export default async function PipelinePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const user = await requireInternalUser();
+  const { q } = await searchParams;
+
+  const where: Prisma.QuotationWhereInput = user.role === "SALES_REP" ? { repId: user.userId } : {};
+  if (q) where.customer = { name: { contains: q } };
 
   const quotations = await db.quotation.findMany({
-    where: user.role === "SALES_REP" ? { repId: user.userId } : {},
+    where,
     include: { customer: true, lines: true, rep: true },
     orderBy: { updatedAt: "desc" },
   });
 
   const closedCount = quotations.filter(
-    (q) => q.status === "REJECTED" || q.status === "CANCELLED",
+    (quo) => quo.status === "REJECTED" || quo.status === "CANCELLED",
   ).length;
 
-  const totalFor = (q: (typeof quotations)[number]) =>
-    q.lines.reduce((s, l) => s + l.qty * l.unitPrice * (1 - l.discountPct / 100), 0);
+  const totalFor = (quo: (typeof quotations)[number]) =>
+    quo.lines.reduce((s, l) => s + l.qty * l.unitPrice * (1 - l.discountPct / 100), 0);
 
   return (
     <div>
@@ -41,10 +52,31 @@ export default async function PipelinePage() {
         description="Deals grouped by stage. Click a card to open it, or move it forward directly."
       />
 
+      <Card className="mb-5 p-4">
+        <form className="flex items-end gap-3">
+          <div className="w-72 space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Search by company</label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input name="q" defaultValue={q ?? ""} placeholder="e.g. Wipro Systems Hub" className="pl-8" />
+            </div>
+          </div>
+          <Button type="submit" variant="outline">
+            Apply
+          </Button>
+          {q && (
+            <Link href="/workspace/pipeline" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+              Clear
+            </Link>
+          )}
+        </form>
+      </Card>
+
       <div className="flex gap-4 overflow-x-auto pb-4">
         {COLUMNS.map((col) => {
-          const items = quotations.filter((q) => q.status === col.status);
-          const columnTotal = items.reduce((s, q) => s + totalFor(q), 0);
+          const items = quotations.filter((quo) => quo.status === col.status);
+          const columnTotal = items.reduce((s, quo) => s + totalFor(quo), 0);
+          const visible = items.slice(0, COLUMN_CARD_LIMIT);
           return (
             <div key={col.status} className="w-72 shrink-0">
               <div className="mb-2 flex items-center justify-between px-1">
@@ -55,23 +87,23 @@ export default async function PipelinePage() {
                 {formatCurrency(columnTotal)}
               </p>
               <div className="space-y-2">
-                {items.map((q) => (
-                  <Card key={q.id} className="p-3">
-                    <Link href={`/workspace/quotations/${q.id}`} className="block">
-                      <p className="text-sm font-medium text-foreground">{q.customer.name}</p>
-                      <p className="text-xs text-muted-foreground">Rep {q.rep.name}</p>
+                {visible.map((quo) => (
+                  <Card key={quo.id} className="p-3">
+                    <Link href={`/workspace/quotations/${quo.id}`} className="block">
+                      <p className="text-sm font-medium text-foreground">{quo.customer.name}</p>
+                      <p className="text-xs text-muted-foreground">Rep {quo.rep.name}</p>
                       <p className="mt-1 text-sm font-semibold text-foreground">
-                        {formatCurrency(totalFor(q))}
+                        {formatCurrency(totalFor(quo))}
                       </p>
-                      {q.riskScore > 0 && (
+                      {quo.riskScore > 0 && (
                         <p className="mt-1 text-xs font-medium text-warning">
-                          Risk {q.riskScore.toFixed(1)}
+                          Risk {quo.riskScore.toFixed(1)}
                         </p>
                       )}
                     </Link>
-                    {col.status === "DRAFT" && q.lines.length > 0 && (
+                    {col.status === "DRAFT" && quo.lines.length > 0 && (
                       <form action={submitForApprovalAction} className="mt-2">
-                        <input type="hidden" name="quotationId" value={q.id} />
+                        <input type="hidden" name="quotationId" value={quo.id} />
                         <Button type="submit" size="sm" variant="outline" className="w-full">
                           Submit for Approval
                         </Button>
@@ -79,7 +111,7 @@ export default async function PipelinePage() {
                     )}
                     {col.status === "APPROVED" && (
                       <form action={confirmOrderAction} className="mt-2">
-                        <input type="hidden" name="quotationId" value={q.id} />
+                        <input type="hidden" name="quotationId" value={quo.id} />
                         <Button type="submit" size="sm" variant="outline" className="w-full">
                           Confirm Order
                         </Button>
@@ -91,6 +123,14 @@ export default async function PipelinePage() {
                   <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                     No deals here
                   </div>
+                )}
+                {items.length > COLUMN_CARD_LIMIT && (
+                  <Link
+                    href={`/workspace/quotations?status=${col.status}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+                    className="block rounded-lg border border-dashed border-border p-3 text-center text-xs font-medium text-primary hover:bg-muted"
+                  >
+                    View all {items.length} in list →
+                  </Link>
                 )}
               </div>
             </div>
@@ -105,13 +145,14 @@ export default async function PipelinePage() {
             </div>
             <div className="space-y-2">
               {quotations
-                .filter((q) => q.status === "REJECTED" || q.status === "CANCELLED")
-                .map((q) => (
-                  <Link key={q.id} href={`/workspace/quotations/${q.id}`}>
+                .filter((quo) => quo.status === "REJECTED" || quo.status === "CANCELLED")
+                .slice(0, COLUMN_CARD_LIMIT)
+                .map((quo) => (
+                  <Link key={quo.id} href={`/workspace/quotations/${quo.id}`}>
                     <Card className="p-3 opacity-70">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-foreground">{q.customer.name}</p>
-                        <StatusBadge status={q.status} />
+                        <p className="text-sm font-medium text-foreground">{quo.customer.name}</p>
+                        <StatusBadge status={quo.status} />
                       </div>
                     </Card>
                   </Link>

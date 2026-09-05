@@ -1,4 +1,5 @@
-import { Download, DollarSign, FileText, Percent } from "lucide-react";
+import Link from "next/link";
+import { Download, DollarSign, FileText, Percent, ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/lib/db";
 import type { Prisma, QuotationStatus } from "@prisma/client";
 import { PageHeader } from "@/components/page-header";
@@ -14,13 +15,23 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 
 const STATUSES = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "UNDER_NEGOTIATION", "CONFIRMED", "FULFILLED", "REJECTED"];
 const CATEGORIES = ["Hardware", "Services", "Subscriptions"];
+const TABLE_PAGE_SIZE = 25;
 
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ repId?: string; status?: string; category?: string; from?: string; to?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    repId?: string;
+    status?: string;
+    category?: string;
+    from?: string;
+    to?: string;
+    page?: string;
+  }>;
 }) {
-  const { repId, status, category, from, to } = await searchParams;
+  const { q, repId, status, category, from, to, page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
   const reps = await db.user.findMany({ where: { role: "SALES_REP" } });
 
   const where: Prisma.QuotationWhereInput = {};
@@ -33,6 +44,7 @@ export default async function ReportsPage({
     };
   }
   if (category) where.lines = { some: { product: { category } } };
+  if (q) where.customer = { name: { contains: q } };
 
   const quotations = await db.quotation.findMany({
     where,
@@ -58,13 +70,19 @@ export default async function ReportsPage({
   }
   const topProducts = [...productTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
 
-  const exportQuery = new URLSearchParams({
+  const totalPages = Math.max(1, Math.ceil(quotations.length / TABLE_PAGE_SIZE));
+  const pageItems = quotations.slice((page - 1) * TABLE_PAGE_SIZE, page * TABLE_PAGE_SIZE);
+
+  const filterParams = {
+    ...(q ? { q } : {}),
     ...(repId ? { repId } : {}),
     ...(status ? { status } : {}),
     ...(category ? { category } : {}),
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
-  }).toString();
+  };
+  const exportQuery = new URLSearchParams(filterParams).toString();
+  const pageQuery = (p: number) => `?${new URLSearchParams({ ...filterParams, page: String(p) }).toString()}`;
 
   return (
     <div className="space-y-6">
@@ -84,6 +102,10 @@ export default async function ReportsPage({
       <Card>
         <CardContent className="pt-5">
           <form className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[180px] space-y-1.5">
+              <Label>Company</Label>
+              <Input name="q" defaultValue={q ?? ""} placeholder="Search company..." className="w-44" />
+            </div>
             <div className="space-y-1.5">
               <Label>Rep</Label>
               <Select name="repId" defaultValue={repId ?? ""} className="w-40">
@@ -168,18 +190,65 @@ export default async function ReportsPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {quotations.map((q) => (
-                <TableRow key={q.id}>
-                  <TableCell className="font-medium text-foreground">{q.customer.name}</TableCell>
-                  <TableCell>{q.rep.name}</TableCell>
+              {pageItems.map((quo) => (
+                <TableRow key={quo.id}>
+                  <TableCell className="font-medium text-foreground">{quo.customer.name}</TableCell>
+                  <TableCell>{quo.rep.name}</TableCell>
                   <TableCell>
-                    <StatusBadge status={q.status} />
+                    <StatusBadge status={quo.status} />
                   </TableCell>
-                  <TableCell>{formatDate(q.createdAt)}</TableCell>
+                  <TableCell>{formatDate(quo.createdAt)}</TableCell>
                 </TableRow>
               ))}
+              {pageItems.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                    No quotations match these filters.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
+
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Showing {(page - 1) * TABLE_PAGE_SIZE + 1}&ndash;
+                {Math.min(page * TABLE_PAGE_SIZE, quotations.length)} of {quotations.length}
+              </p>
+              <div className="flex items-center gap-2">
+                {page <= 1 ? (
+                  <Button variant="outline" size="sm" disabled>
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                ) : (
+                  <Link href={pageQuery(page - 1)}>
+                    <Button variant="outline" size="sm">
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+                  </Link>
+                )}
+                <span className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages}
+                </span>
+                {page >= totalPages ? (
+                  <Button variant="outline" size="sm" disabled>
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Link href={pageQuery(page + 1)}>
+                    <Button variant="outline" size="sm">
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Search } from "lucide-react";
 import { db } from "@/lib/db";
 import { createProductAction } from "@/app/actions/admin";
 import { PageHeader } from "@/components/page-header";
@@ -9,13 +11,28 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
+import type { Prisma } from "@prisma/client";
 
-export default async function ProductsAdminPage() {
-  const products = await db.product.findMany({ orderBy: { category: "asc" } });
+const CATEGORIES = ["Hardware", "Services", "Subscriptions"] as const;
+
+export default async function ProductsAdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; category?: string }>;
+}) {
+  const { q, category } = await searchParams;
+  const where: Prisma.ProductWhereInput = {};
+  if (q) where.name = { contains: q };
+  if (category) where.category = category;
+
+  const products = await db.product.findMany({ where, orderBy: [{ category: "asc" }, { name: "asc" }] });
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Products & Price List" description="General product catalog used across quotations." />
+      <PageHeader
+        title="Products & Price List"
+        description={`${products.length} product${products.length === 1 ? "" : "s"} in the catalog.`}
+      />
 
       <Card>
         <CardContent className="pt-5">
@@ -27,9 +44,9 @@ export default async function ProductsAdminPage() {
             <div className="space-y-1.5">
               <Label>Category</Label>
               <Select name="category" className="w-36">
-                <option>Hardware</option>
-                <option>Services</option>
-                <option>Subscriptions</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
               </Select>
             </div>
             <div className="space-y-1.5">
@@ -51,6 +68,37 @@ export default async function ProductsAdminPage() {
             <Button type="submit">Add Product</Button>
           </form>
         </CardContent>
+      </Card>
+
+      <Card className="p-4">
+        <form className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[200px] flex-1 space-y-1.5">
+            <Label className="text-xs">Search by name</Label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input name="q" defaultValue={q ?? ""} placeholder="e.g. Laptop" className="pl-8" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Category</Label>
+            <Select name="category" defaultValue={category ?? ""} className="w-40">
+              <option value="">All categories</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <Button type="submit" variant="outline">
+            Apply
+          </Button>
+          {(q || category) && (
+            <Link href="/admin/products" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+              Clear
+            </Link>
+          )}
+        </form>
       </Card>
 
       <Card>
@@ -80,6 +128,13 @@ export default async function ProductsAdminPage() {
                 <TableCell>{p.taxPct}%</TableCell>
               </TableRow>
             ))}
+            {products.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                  No products match these filters.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </Card>

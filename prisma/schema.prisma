@@ -100,6 +100,9 @@ model Customer {
   createdAt        DateTime @default(now())
 
   quotations Quotation[]
+
+  @@index([tier])
+  @@index([name])
 }
 
 model Product {
@@ -116,6 +119,9 @@ model Product {
   quotationLines   QuotationLine[]
   upsellBase       UpsellRule[] @relation("BaseProduct")
   upsellSuggested  UpsellRule[] @relation("SuggestedProduct")
+
+  @@index([category])
+  @@index([name])
 }
 
 model DiscountCeiling {
@@ -183,6 +189,11 @@ model Quotation {
   billingEntries BillingScheduleEntry[]
   negotiations   NegotiationMessage[]
   invoices       Invoice[]
+
+  @@index([customerId])
+  @@index([repId])
+  @@index([status])
+  @@index([updatedAt])
 }
 
 model QuotationLine {
@@ -228,6 +239,8 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
 }
 
 model FulfillmentSplit {

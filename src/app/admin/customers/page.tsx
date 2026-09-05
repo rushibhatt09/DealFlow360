@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Search } from "lucide-react";
 import { db } from "@/lib/db";
 import {
   createCustomerAction,
@@ -12,17 +14,27 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
+import type { CustomerTier, Prisma } from "@prisma/client";
 
 const TIERS = ["BRONZE", "SILVER", "GOLD"] as const;
 
-export default async function CustomersAdminPage() {
-  const customers = await db.customer.findMany({ orderBy: { createdAt: "asc" } });
+export default async function CustomersAdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; tier?: string }>;
+}) {
+  const { q, tier } = await searchParams;
+  const where: Prisma.CustomerWhereInput = {};
+  if (q) where.name = { contains: q };
+  if (tier) where.tier = tier as CustomerTier;
+
+  const customers = await db.customer.findMany({ where, orderBy: { name: "asc" } });
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Customers &amp; Portal Access"
-        description="Every account that can sign in to the customer negotiation portal."
+        description={`${customers.length} account${customers.length === 1 ? "" : "s"} that can sign in to the customer negotiation portal.`}
       />
 
       <Card>
@@ -56,6 +68,37 @@ export default async function CustomersAdminPage() {
             <Button type="submit">Create Customer</Button>
           </form>
         </CardContent>
+      </Card>
+
+      <Card className="p-4">
+        <form className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[200px] flex-1 space-y-1.5">
+            <Label className="text-xs">Search by company</Label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input name="q" defaultValue={q ?? ""} placeholder="e.g. Patel Electronics" className="pl-8" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Tier</Label>
+            <Select name="tier" defaultValue={tier ?? ""} className="w-36">
+              <option value="">All tiers</option>
+              {TIERS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <Button type="submit" variant="outline">
+            Apply
+          </Button>
+          {(q || tier) && (
+            <Link href="/admin/customers" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+              Clear
+            </Link>
+          )}
+        </form>
       </Card>
 
       <div className="space-y-3">

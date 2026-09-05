@@ -67,6 +67,15 @@ export default async function DealHealthDashboard() {
   }
 
   const byId = new Map(openQuotations.map((q) => [q.id, q]));
+  const LIST_LIMIT = 8;
+
+  const stalledSorted = [...stalledIds].sort(
+    (a, b) => byId.get(a)!.lastActivityAt.getTime() - byId.get(b)!.lastActivityAt.getTime(),
+  );
+  const slippedSorted = [...slippedIds].sort(
+    (a, b) => byId.get(a)!.lastActivityAt.getTime() - byId.get(b)!.lastActivityAt.getTime(),
+  );
+  const anomaliesSorted = [...anomalies].sort((a, b) => b.deltaPts - a.deltaPts);
 
   const NudgeButton = ({ quotationId }: { quotationId: string }) =>
     canNudge ? (
@@ -97,7 +106,7 @@ export default async function DealHealthDashboard() {
           <CardTitle>Stalled Deals</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {[...stalledIds].map((id) => {
+          {stalledSorted.slice(0, LIST_LIMIT).map((id) => {
             const q = byId.get(id)!;
             return (
               <div
@@ -113,6 +122,11 @@ export default async function DealHealthDashboard() {
             );
           })}
           {stalledIds.size === 0 && <p className="text-sm text-muted-foreground">No stalled deals right now.</p>}
+          {stalledSorted.length > LIST_LIMIT && (
+            <p className="pt-1 text-xs text-muted-foreground">
+              Showing the {LIST_LIMIT} longest-stalled of {stalledSorted.length}. Use the Quotations list to filter the rest.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -121,7 +135,7 @@ export default async function DealHealthDashboard() {
           <CardTitle>Discount Anomaly Alerts</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {anomalies.map((a) => (
+          {anomaliesSorted.slice(0, LIST_LIMIT).map((a) => (
             <div
               key={a.quotationId}
               className="flex items-center justify-between gap-3 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2.5 text-sm"
@@ -134,6 +148,11 @@ export default async function DealHealthDashboard() {
             </div>
           ))}
           {anomalies.length === 0 && <p className="text-sm text-muted-foreground">No anomalies detected.</p>}
+          {anomaliesSorted.length > LIST_LIMIT && (
+            <p className="pt-1 text-xs text-muted-foreground">
+              Showing the {LIST_LIMIT} largest of {anomaliesSorted.length} anomalies.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -142,7 +161,7 @@ export default async function DealHealthDashboard() {
           <CardTitle>Delivery Promise Slippage</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {[...slippedIds].map((id) => {
+          {slippedSorted.slice(0, LIST_LIMIT).map((id) => {
             const q = byId.get(id)!;
             return (
               <div
@@ -158,6 +177,11 @@ export default async function DealHealthDashboard() {
             );
           })}
           {slippedIds.size === 0 && <p className="text-sm text-muted-foreground">No slippage detected.</p>}
+          {slippedSorted.length > LIST_LIMIT && (
+            <p className="pt-1 text-xs text-muted-foreground">
+              Showing {LIST_LIMIT} of {slippedSorted.length}. Use the Quotations list to filter the rest.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>
